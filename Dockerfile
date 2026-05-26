@@ -29,16 +29,14 @@ RUN mkdir config
 COPY config/config.exs config/${MIX_ENV}.exs config/
 RUN mix deps.compile
 
+# Copy source and compile (generates phoenix-colocated module needed by esbuild)
+COPY priv priv
+COPY lib lib
+RUN mix compile
+
 # Copy assets and build them
 COPY assets assets
 RUN mix assets.deploy
-
-# Copy remaining source
-COPY priv priv
-COPY lib lib
-
-# Compile project
-RUN mix compile
 
 # Copy runtime config (after compile, so it is not included in compilation)
 COPY config/runtime.exs config/
