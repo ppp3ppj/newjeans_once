@@ -21,7 +21,7 @@ defmodule NewjeansOnceWeb.BoardLive do
      |> assign(:new_form, to_form(Board.change_message(%Message{})))
      |> assign(:editing_id, nil)
      |> assign(:edit_form, nil)
-     |> assign(:delete_id, nil)
+     |> assign(:delete_msg, nil)
      |> stream(:messages, Board.list_messages())}
   end
 
@@ -99,14 +99,14 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   # Delete
   def handle_event("confirm_delete", %{"id" => id}, socket),
-    do: {:noreply, assign(socket, :delete_id, id)}
+    do: {:noreply, assign(socket, :delete_msg, Board.get_message!(id))}
 
   def handle_event("cancel_delete", _, socket),
-    do: {:noreply, assign(socket, :delete_id, nil)}
+    do: {:noreply, assign(socket, :delete_msg, nil)}
 
   def handle_event("delete", _, socket) do
-    Board.delete_message(Board.get_message!(socket.assigns.delete_id))
-    {:noreply, assign(socket, :delete_id, nil)}
+    Board.delete_message(socket.assigns.delete_msg)
+    {:noreply, assign(socket, :delete_msg, nil)}
   end
 
   def render(assigns) do
@@ -299,7 +299,7 @@ defmodule NewjeansOnceWeb.BoardLive do
       </div>
       <%!-- ── DELETE MODAL ─────────────────────────────────────── --%>
       <div
-        :if={@delete_id != nil}
+        :if={@delete_msg != nil}
         id="delete-modal-overlay"
         phx-hook="ModalScrollLock"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -311,11 +311,21 @@ defmodule NewjeansOnceWeb.BoardLive do
               // DELETE POST?
             </h2>
           </div>
-          <div class="px-6 py-5 flex flex-col gap-5">
-            <p class="font-black uppercase tracking-widest text-white/80 text-sm">
+          <div class="px-6 py-5 flex flex-col gap-4">
+            <%!-- Post preview --%>
+            <div class="border-[3px] border-white/50 bg-white/10 px-4 py-3 flex flex-col gap-1">
+              <p class="font-black uppercase tracking-wide text-white leading-tight line-clamp-2">
+                {@delete_msg.title}
+              </p>
+              <p class="font-black uppercase text-[10px] tracking-widest text-white/70 flex items-center gap-1.5">
+                <span class="bg-white/20 px-1.5 py-0.5">BY</span>
+                {@delete_msg.author}
+              </p>
+            </div>
+            <p class="font-black uppercase tracking-widest text-white/70 text-xs">
               This cannot be undone.
             </p>
-            <div class="flex gap-3 justify-end border-t-[3px] border-white/30 pt-4">
+            <div class="flex gap-3 justify-end border-t-[3px] border-white/30 pt-3">
               <button
                 phx-click="cancel_delete"
                 class="font-black uppercase text-xs tracking-widest px-4 py-2 border-[2px] border-white text-white hover:bg-white hover:text-[#ff0000] transition-colors duration-150"
