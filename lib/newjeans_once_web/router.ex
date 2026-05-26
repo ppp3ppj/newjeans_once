@@ -17,7 +17,7 @@ defmodule NewjeansOnceWeb.Router do
   scope "/", NewjeansOnceWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", BoardLive
     get "/up", HealthController, :check
     live "/bunnies", PresenceLive
     live "/board", BoardLive

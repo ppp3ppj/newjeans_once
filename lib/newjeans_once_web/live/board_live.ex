@@ -2,17 +2,27 @@ defmodule NewjeansOnceWeb.BoardLive do
   use NewjeansOnceWeb, :live_view
   alias NewjeansOnce.Board
   alias NewjeansOnce.Board.Message
+  alias NewjeansOnce.Presence
+
+  @presence_topic "bunnies:lobby"
 
   def mount(_params, _session, socket) do
-    if connected?(socket), do: Board.subscribe()
+    if connected?(socket) do
+      Board.subscribe()
+      {:ok, _} = Presence.track(self(), @presence_topic, socket.id, %{})
+      Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, @presence_topic)
+    end
 
     {:ok,
      socket
+     |> assign(:fan_count, count_fans())
      |> assign(:new_form, to_form(Board.change_message(%Message{})))
      |> assign(:editing_id, nil)
      |> assign(:edit_form, nil)
      |> stream(:messages, Board.list_messages())}
   end
+
+  defp count_fans, do: Presence.list(@presence_topic) |> map_size()
 
   # PubSub — real-time sync across all browsers
   def handle_info({:created, msg}, socket),
@@ -23,6 +33,9 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   def handle_info({:deleted, msg}, socket),
     do: {:noreply, stream_delete(socket, :messages, msg)}
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket),
+    do: {:noreply, assign(socket, :fan_count, count_fans())}
 
   # Create
   def handle_event("validate_new", %{"message" => p}, socket) do
@@ -90,6 +103,21 @@ defmodule NewjeansOnceWeb.BoardLive do
           </p>
           <%!-- Background deco block --%>
           <div class="absolute top-0 right-0 w-20 h-20 bg-[#ff0000] opacity-[0.06] rotate-45 -z-10 hidden sm:block">
+          </div>
+        </div>
+
+        <%!-- Bunnies counter — cyan block with hard shadow --%>
+        <div class="flex items-center gap-4 border-[4px] border-black dark:border-white bg-[#00ffff] shadow-[4px_4px_0_#000000] dark:shadow-[4px_4px_0_#ffffff] px-5 py-4 self-start">
+          <span class="text-4xl select-none">🐰</span>
+          <div>
+            <p class="font-black text-5xl text-black leading-none tabular-nums">{@fan_count}</p>
+            <p class="font-black uppercase tracking-widest text-[10px] text-black mt-0.5">
+              {if @fan_count == 1, do: "BUNNY", else: "BUNNIES"} ONLINE
+            </p>
+          </div>
+          <div class="ml-auto flex items-center gap-1.5 border-l-[3px] border-black pl-4">
+            <span class="w-2.5 h-2.5 bg-green-600 rounded-full animate-pulse"></span>
+            <span class="font-black uppercase text-[10px] text-black tracking-widest">LIVE</span>
           </div>
         </div>
 
