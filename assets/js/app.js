@@ -26,10 +26,18 @@ import {hooks as colocatedHooks} from "phoenix-colocated/newjeans_once"
 import topbar from "../vendor/topbar"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+
+const Hooks = {
+  ModalScrollLock: {
+    mounted()   { document.body.classList.add("overflow-hidden") },
+    destroyed() { document.body.classList.remove("overflow-hidden") },
+  },
+}
+
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, ...Hooks},
 })
 
 // Show progress bar on live navigation and form submits

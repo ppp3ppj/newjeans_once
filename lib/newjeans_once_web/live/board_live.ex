@@ -190,6 +190,8 @@ defmodule NewjeansOnceWeb.BoardLive do
       <%!-- ── NEW POST MODAL ─────────────────────────────────── --%>
       <div
         :if={@show_new_modal}
+        id="new-post-modal-overlay"
+        phx-hook="ModalScrollLock"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <%!-- Backdrop --%>
@@ -250,6 +252,8 @@ defmodule NewjeansOnceWeb.BoardLive do
       <%!-- ── EDIT MODAL ──────────────────────────────────────── --%>
       <div
         :if={@editing_id != nil}
+        id="edit-modal-overlay"
+        phx-hook="ModalScrollLock"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <%!-- Backdrop --%>
@@ -296,6 +300,8 @@ defmodule NewjeansOnceWeb.BoardLive do
       <%!-- ── DELETE MODAL ─────────────────────────────────────── --%>
       <div
         :if={@delete_id != nil}
+        id="delete-modal-overlay"
+        phx-hook="ModalScrollLock"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <div class="absolute inset-0 bg-black/60" phx-click="cancel_delete"></div>
