@@ -20,16 +20,9 @@ if System.get_env("PHX_SERVER") do
   config :newjeans_once, NewjeansOnceWeb.Endpoint, server: true
 end
 
-config :newjeans_once, NewjeansOnceWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
-
 if config_env() == :prod do
   database_path =
-    System.get_env("DATABASE_PATH") ||
-      raise """
-      environment variable DATABASE_PATH is missing.
-      For example: /etc/newjeans_once/newjeans_once.db
-      """
+    System.get_env("DATABASE_PATH", "/storage/newjeans_once.db")
 
   config :newjeans_once, NewjeansOnce.Repo,
     database: database_path,
@@ -54,6 +47,7 @@ if config_env() == :prod do
   config :newjeans_once, NewjeansOnceWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
+      port: String.to_integer(System.get_env("PORT", "80")),
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
       # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0

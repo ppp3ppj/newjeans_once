@@ -39,3 +39,5 @@ npm-debug.log
 *.db
 *.db-*
 
+# Ignore app release files, including build artifacts
+/rel/app

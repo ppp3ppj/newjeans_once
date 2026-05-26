@@ -1,0 +1,20 @@
+# Build artifacts
+_build/
+deps/
+
+# Development/test files
+.git/
+.elixir_ls/
+test/
+
+# Config that shouldn't be in image
+.env
+*.env
+
+# Logs
+*.log
+
+# Editor files
+.vscode/
+*.swp
+*.swo

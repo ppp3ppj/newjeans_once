@@ -18,6 +18,7 @@ defmodule NewjeansOnceWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/up", HealthController, :check
   end
 
   # Other scopes may use custom stacks.
