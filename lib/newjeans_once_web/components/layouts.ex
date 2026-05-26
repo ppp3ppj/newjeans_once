@@ -47,6 +47,9 @@ defmodule NewjeansOnceWeb.Layouts do
           <span class="font-black text-base uppercase tracking-widest hidden sm:block">
             FanWall
           </span>
+          <code class="hidden sm:block font-mono font-black text-[10px] tracking-widest text-white/50 border-[2px] border-white/30 px-1.5 py-0.5">
+            v{Application.spec(:newjeans_once, :vsn)}
+          </code>
         </a>
         <div class="flex items-center gap-2 sm:gap-3">
           <div

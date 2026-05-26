@@ -29,6 +29,10 @@ RUN mkdir config
 COPY config/config.exs config/${MIX_ENV}.exs config/
 RUN mix deps.compile
 
+# Version stamp — override with: docker build --build-arg APP_VERSION=1.2.3 .
+ARG APP_VERSION=0.1.0
+ENV APP_VERSION=${APP_VERSION}
+
 # Copy source and compile (generates phoenix-colocated module needed by esbuild)
 COPY priv priv
 COPY lib lib
