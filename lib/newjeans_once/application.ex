@@ -14,6 +14,7 @@ defmodule NewjeansOnce.Application do
        repos: Application.fetch_env!(:newjeans_once, :ecto_repos), skip: skip_migrations?()},
       {DNSCluster, query: Application.get_env(:newjeans_once, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: NewjeansOnce.PubSub},
+      NewjeansOnce.Presence,
       # Start a worker by calling: NewjeansOnce.Worker.start_link(arg)
       # {NewjeansOnce.Worker, arg},
       # Start to serve requests, typically the last entry
