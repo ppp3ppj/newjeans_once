@@ -242,7 +242,7 @@ defmodule NewjeansOnceWeb.CoreComponents do
     ~H"""
     <div class="fieldset mb-2">
       <label for={@id}>
-        <span :if={@label} class="label mb-1">{@label}</span>
+        <span :if={@label} class="label mb-1 font-black uppercase tracking-widest text-[10px]">{@label}</span>
         <select
           id={@id}
           name={@name}
@@ -263,7 +263,7 @@ defmodule NewjeansOnceWeb.CoreComponents do
     ~H"""
     <div class="fieldset mb-2">
       <label for={@id}>
-        <span :if={@label} class="label mb-1">{@label}</span>
+        <span :if={@label} class="label mb-1 font-black uppercase tracking-widest text-[10px]">{@label}</span>
         <textarea
           id={@id}
           name={@name}
@@ -284,7 +284,7 @@ defmodule NewjeansOnceWeb.CoreComponents do
     ~H"""
     <div class="fieldset mb-2">
       <label for={@id}>
-        <span :if={@label} class="label mb-1">{@label}</span>
+        <span :if={@label} class="label mb-1 font-black uppercase tracking-widest text-[10px]">{@label}</span>
         <input
           type={@type}
           name={@name}
@@ -305,8 +305,10 @@ defmodule NewjeansOnceWeb.CoreComponents do
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""
-    <p class="mt-1.5 flex gap-2 items-center text-sm text-error">
-      <.icon name="hero-exclamation-circle" class="size-5" />
+    <p class="mt-1 flex items-center gap-1.5 font-black uppercase text-[10px] tracking-widest text-[#ff0000]">
+      <span class="inline-flex items-center justify-center w-4 h-4 bg-[#ff0000] text-white font-black text-[10px] shrink-0 leading-none">
+        !
+      </span>
       {render_slot(@inner_block)}
     </p>
     """

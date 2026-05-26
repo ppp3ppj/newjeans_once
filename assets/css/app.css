@@ -168,9 +168,11 @@
 }
 
 .input-error,
-.textarea-error {
-  border-color: var(--color-error);
-  box-shadow: 3px 3px 0 var(--color-error);
+.textarea-error,
+.select-error {
+  border-color: #ff0000;
+  box-shadow: 4px 4px 0 #ff0000;
+  border-left-width: 6px;
 }
 
 [data-theme=dark] .input,
