@@ -137,6 +137,22 @@ defmodule NewjeansOnceWeb.BoardLive do
           <div
             :for={{id, msg} <- @streams.messages}
             id={id}
+            phx-mounted={
+              JS.transition(
+                {"transition-all duration-200 ease-out",
+                 "opacity-0 -translate-y-3",
+                 "opacity-100 translate-y-0"},
+                time: 200
+              )
+            }
+            phx-remove={
+              JS.transition(
+                {"transition-all duration-150 ease-in",
+                 "opacity-100 translate-x-0 rotate-0",
+                 "opacity-0 translate-x-16 rotate-1"},
+                time: 150
+              )
+            }
             class="border-[4px] border-black dark:border-white bg-base-100 overflow-hidden group shadow-[5px_5px_0_#000000] dark:shadow-[5px_5px_0_#ffffff] transition-all duration-150 hover:-translate-x-[3px] hover:-translate-y-[3px] hover:shadow-[8px_8px_0_#000000] dark:hover:shadow-[8px_8px_0_#ffffff]"
           >
             <img
