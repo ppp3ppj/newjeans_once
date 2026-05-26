@@ -95,10 +95,10 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} fan_count={@fan_count}>
       <div class="max-w-3xl mx-auto flex flex-col gap-8">
         <%!-- Hero header + action row --%>
-        <div class="pt-4 pb-2 relative">
+        <div class="pt-4 pb-2 flex items-end justify-between gap-4">
           <div class="relative inline-block">
             <h1 class="text-5xl sm:text-7xl font-black uppercase tracking-widest leading-none text-base-content">
               FAN WALL
@@ -108,34 +108,11 @@ defmodule NewjeansOnceWeb.BoardLive do
               ★
             </div>
           </div>
-          <p class="font-black uppercase tracking-[0.25em] mt-4 text-xs text-base-content/50">
-            ✦ Your posts appear live on every screen ✦
-          </p>
-        </div>
-
-        <%!-- Counter + action row --%>
-        <div class="flex flex-wrap items-stretch gap-4">
-          <%!-- Bunnies counter — cyan block --%>
-          <div class="flex items-center gap-4 border-[4px] border-black dark:border-white bg-[#00ffff] shadow-[4px_4px_0_#000000] dark:shadow-[4px_4px_0_#ffffff] px-5 py-4 flex-1 min-w-[200px]">
-            <span class="text-4xl select-none">🐰</span>
-            <div>
-              <p class="font-black text-5xl text-black leading-none tabular-nums">{@fan_count}</p>
-              <p class="font-black uppercase tracking-widest text-[10px] text-black mt-0.5">
-                {if @fan_count == 1, do: "BUNNY", else: "BUNNIES"} ONLINE
-              </p>
-            </div>
-            <div class="ml-auto flex items-center gap-1.5 border-l-[3px] border-black pl-4">
-              <span class="w-2.5 h-2.5 bg-green-600 rounded-full animate-pulse"></span>
-              <span class="font-black uppercase text-[10px] text-black tracking-widest">LIVE</span>
-            </div>
-          </div>
-
-          <%!-- New post button --%>
           <button
             phx-click="open_new_modal"
-            class="btn btn-neutral flex-none self-stretch flex items-center gap-2 px-6 text-base"
+            class="btn btn-neutral shrink-0 flex items-center gap-2 px-6"
           >
-            <span class="text-xl">✚</span> NEW POST
+            <span class="text-lg">✚</span> NEW POST
           </button>
         </div>
 

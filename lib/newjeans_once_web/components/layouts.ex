@@ -31,13 +31,15 @@ defmodule NewjeansOnceWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :fan_count, :integer, default: nil
+
   slot :inner_block, required: true
 
   def app(assigns) do
     ~H"""
     <header class="sticky top-0 z-50 bg-black text-white border-b-[6px] border-[#ff0000]">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-        <a href="/" class="flex items-center gap-3 shrink-0 group">
+        <a href="/" class="flex items-center gap-3 shrink-0">
           <div class="w-10 h-10 bg-[#ff0000] border-[3px] border-white flex items-center justify-center font-black text-white text-xs leading-none tracking-tighter">
             FW
           </div>
@@ -46,18 +48,17 @@ defmodule NewjeansOnceWeb.Layouts do
           </span>
         </a>
         <div class="flex items-center gap-2 sm:gap-3">
-          <a
-            href="https://phoenixframework.org/"
-            class="font-black uppercase tracking-wider text-xs px-2 sm:px-3 py-1.5 border-[2px] border-transparent hover:border-white hover:bg-[#ff0000] hover:text-black transition-all duration-150"
+          <div
+            :if={@fan_count != nil}
+            class="flex items-center gap-2 border-[2px] border-white bg-[#00ffff] px-3 py-1.5"
           >
-            Website
-          </a>
-          <a
-            href="https://github.com/phoenixframework/phoenix"
-            class="font-black uppercase tracking-wider text-xs px-2 sm:px-3 py-1.5 border-[2px] border-transparent hover:border-white hover:bg-[#ffff00] hover:text-black transition-all duration-150"
-          >
-            GitHub
-          </a>
+            <span class="text-base leading-none select-none">🐰</span>
+            <span class="font-black text-sm text-black tabular-nums leading-none">{@fan_count}</span>
+            <span class="font-black uppercase text-[10px] text-black tracking-widest hidden sm:block leading-none">
+              {if @fan_count == 1, do: "BUNNY", else: "BUNNIES"}
+            </span>
+            <span class="w-2 h-2 bg-green-600 rounded-full animate-pulse shrink-0"></span>
+          </div>
           <.theme_toggle />
         </div>
       </div>
