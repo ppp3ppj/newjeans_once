@@ -150,17 +150,21 @@ defmodule NewjeansOnceWeb.BoardLive do
                     <span class="text-[#ff0000] dark:text-[#ff6666]">{msg.author}</span>
                   </p>
                 </div>
-                <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <button phx-click="edit" phx-value-id={msg.id} class="btn btn-ghost btn-xs">
-                    ✏️
+                <div class="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    phx-click="edit"
+                    phx-value-id={msg.id}
+                    class="font-black uppercase text-[10px] tracking-widest px-2 py-1 border-[2px] border-black dark:border-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors duration-150"
+                  >
+                    EDIT
                   </button>
                   <button
                     phx-click="delete"
                     phx-value-id={msg.id}
                     data-confirm="Delete this post?"
-                    class="btn btn-ghost btn-xs text-error"
+                    class="font-black uppercase text-[10px] tracking-widest px-2 py-1 border-[2px] border-[#ff0000] text-[#ff0000] hover:bg-[#ff0000] hover:text-white transition-colors duration-150"
                   >
-                    🗑
+                    DEL
                   </button>
                 </div>
               </div>
