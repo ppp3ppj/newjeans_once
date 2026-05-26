@@ -36,6 +36,12 @@ defmodule NewjeansOnce.Board do
   def change_message(%Message{} = message, attrs \\ %{}),
     do: Message.changeset(message, attrs)
 
+  def delete_all_messages do
+    Repo.delete_all(Message)
+    Phoenix.PubSub.broadcast(NewjeansOnce.PubSub, @topic, {:nuked})
+    :ok
+  end
+
   defp broadcast({:ok, message}, event) do
     Phoenix.PubSub.broadcast(NewjeansOnce.PubSub, @topic, {event, message})
     {:ok, message}

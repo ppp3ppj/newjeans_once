@@ -22,6 +22,8 @@ defmodule NewjeansOnceWeb.BoardLive do
      |> assign(:editing_id, nil)
      |> assign(:edit_form, nil)
      |> assign(:delete_msg, nil)
+     |> assign(:star_clicks, 0)
+     |> assign(:show_nuke_modal, false)
      |> stream(:messages, Board.list_messages())}
   end
 
@@ -47,6 +49,13 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket),
     do: {:noreply, assign(socket, :fan_count, count_fans())}
+
+  def handle_info({:nuked}, socket) do
+    {:noreply,
+     socket
+     |> assign(:post_count, 0)
+     |> stream(:messages, [], reset: true)}
+  end
 
   # New-post modal
   def handle_event("open_new_modal", _, socket),
@@ -97,6 +106,30 @@ defmodule NewjeansOnceWeb.BoardLive do
     end
   end
 
+  # Secret nuke — triggered by clicking ★ sticker 3 times
+  def handle_event("star_click", _, socket) do
+    clicks = socket.assigns.star_clicks + 1
+
+    if clicks >= 3 do
+      {:noreply, assign(socket, star_clicks: 0, show_nuke_modal: true)}
+    else
+      {:noreply, assign(socket, :star_clicks, clicks)}
+    end
+  end
+
+  def handle_event("close_nuke_modal", _, socket),
+    do: {:noreply, assign(socket, show_nuke_modal: false, star_clicks: 0)}
+
+  def handle_event("nuke_all", _, socket) do
+    Board.delete_all_messages()
+
+    {:noreply,
+     socket
+     |> assign(:show_nuke_modal, false)
+     |> assign(:post_count, 0)
+     |> stream(:messages, [], reset: true)}
+  end
+
   # Delete
   def handle_event("confirm_delete", %{"id" => id}, socket),
     do: {:noreply, assign(socket, :delete_msg, Board.get_message!(id))}
@@ -120,9 +153,13 @@ defmodule NewjeansOnceWeb.BoardLive do
               FAN WALL
             </h1>
             <div class="w-full h-[6px] bg-base-content mt-2"></div>
-            <div class="absolute -top-4 -right-10 w-12 h-12 bg-[#ffff00] border-[3px] border-black dark:border-white rotate-12 hidden sm:flex items-center justify-center text-xl font-black text-black select-none">
+            <button
+              phx-click="star_click"
+              class="absolute -top-4 -right-10 w-12 h-12 bg-[#ffff00] border-[3px] border-black dark:border-white rotate-12 hidden sm:flex items-center justify-center text-xl font-black text-black select-none cursor-pointer hover:scale-110 transition-transform duration-150"
+              title=""
+            >
               ★
-            </div>
+            </button>
           </div>
           <button
             phx-click="open_new_modal"
@@ -353,6 +390,45 @@ defmodule NewjeansOnceWeb.BoardLive do
                 class="font-black uppercase text-xs tracking-widest px-4 py-2 border-[2px] border-black bg-black text-white hover:bg-white hover:text-black transition-colors duration-150"
               >
                 DELETE →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <%!-- ── NUKE MODAL (secret: click ★ × 3) ───────────────── --%>
+      <div
+        :if={@show_nuke_modal}
+        id="nuke-modal-overlay"
+        phx-hook="ModalScrollLock"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div class="absolute inset-0 bg-black/90" phx-click="close_nuke_modal"></div>
+        <div class="relative z-10 w-full max-w-sm border-[4px] border-[#ff0000] bg-black shadow-[8px_8px_0_#ff0000]">
+          <div class="border-b-[4px] border-[#ff0000] px-6 py-4 flex items-center gap-3">
+            <span class="font-black text-2xl text-[#ff0000] animate-pulse">⚠</span>
+            <h2 class="font-black text-xl uppercase tracking-widest text-[#ff0000]">
+              NUKE WALL?
+            </h2>
+          </div>
+          <div class="px-6 py-5 flex flex-col gap-3">
+            <p class="font-black uppercase tracking-widest text-white text-sm">
+              Delete all {@post_count} {if @post_count == 1, do: "post", else: "posts"}.
+            </p>
+            <p class="font-black uppercase tracking-[0.2em] text-[#ff0000]/60 text-[10px]">
+              Cannot be undone. Ever.
+            </p>
+            <div class="flex gap-3 justify-end border-t-[3px] border-[#ff0000]/20 pt-4">
+              <button
+                phx-click="close_nuke_modal"
+                class="font-black uppercase text-xs tracking-widest px-4 py-2 border-[2px] border-white text-white hover:bg-white hover:text-black transition-colors duration-150"
+              >
+                ABORT
+              </button>
+              <button
+                phx-click="nuke_all"
+                class="font-black uppercase text-xs tracking-widest px-4 py-2 border-[2px] border-[#ff0000] text-[#ff0000] hover:bg-[#ff0000] hover:text-white transition-colors duration-150"
+              >
+                NUKE ALL →
               </button>
             </div>
           </div>
