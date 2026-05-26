@@ -20,6 +20,7 @@ defmodule NewjeansOnceWeb.Router do
     get "/", PageController, :home
     get "/up", HealthController, :check
     live "/bunnies", PresenceLive
+    live "/board", BoardLive
   end
 
   # Other scopes may use custom stacks.
