@@ -51,9 +51,9 @@ defmodule NewjeansOnceWeb.Layouts do
         <div class="flex items-center gap-2 sm:gap-3">
           <div
             :if={@post_count != nil}
-            class="flex items-center gap-2 border-[2px] border-white bg-[#ffff00] px-3 py-1.5"
+            class="flex items-center gap-1.5 border-[2px] border-white bg-[#ffff00] px-3 py-1.5"
           >
-            <span class="text-base leading-none select-none">📝</span>
+            <span class="font-black text-xs text-black leading-none select-none">//</span>
             <span class="font-black text-sm text-black tabular-nums leading-none">{@post_count}</span>
             <span class="font-black uppercase text-[10px] text-black tracking-widest hidden sm:block leading-none">
               {if @post_count == 1, do: "POST", else: "POSTS"}
