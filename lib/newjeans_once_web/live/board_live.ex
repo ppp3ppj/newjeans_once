@@ -21,6 +21,7 @@ defmodule NewjeansOnceWeb.BoardLive do
      |> assign(:new_form, to_form(Board.change_message(%Message{})))
      |> assign(:editing_id, nil)
      |> assign(:edit_form, nil)
+     |> assign(:delete_id, nil)
      |> stream(:messages, Board.list_messages())}
   end
 
@@ -97,9 +98,15 @@ defmodule NewjeansOnceWeb.BoardLive do
   end
 
   # Delete
-  def handle_event("delete", %{"id" => id}, socket) do
-    Board.delete_message(Board.get_message!(id))
-    {:noreply, socket}
+  def handle_event("confirm_delete", %{"id" => id}, socket),
+    do: {:noreply, assign(socket, :delete_id, id)}
+
+  def handle_event("cancel_delete", _, socket),
+    do: {:noreply, assign(socket, :delete_id, nil)}
+
+  def handle_event("delete", _, socket) do
+    Board.delete_message(Board.get_message!(socket.assigns.delete_id))
+    {:noreply, assign(socket, :delete_id, nil)}
   end
 
   def render(assigns) do
@@ -159,9 +166,8 @@ defmodule NewjeansOnceWeb.BoardLive do
                     EDIT
                   </button>
                   <button
-                    phx-click="delete"
+                    phx-click="confirm_delete"
                     phx-value-id={msg.id}
-                    data-confirm="Delete this post?"
                     class="font-black uppercase text-[10px] tracking-widest px-2 py-1 border-[2px] border-[#ff0000] text-[#ff0000] hover:bg-[#ff0000] hover:text-white transition-colors duration-150"
                   >
                     DEL
@@ -285,6 +291,39 @@ defmodule NewjeansOnceWeb.BoardLive do
               </button>
             </div>
           </.form>
+        </div>
+      </div>
+      <%!-- ── DELETE MODAL ─────────────────────────────────────── --%>
+      <div
+        :if={@delete_id != nil}
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div class="absolute inset-0 bg-black/60" phx-click="cancel_delete"></div>
+        <div class="relative z-10 w-full max-w-sm border-[4px] border-black shadow-[8px_8px_0_#000000] bg-[#ff0000]">
+          <div class="border-b-[4px] border-black px-6 py-4">
+            <h2 class="font-black text-xl uppercase tracking-widest text-white">
+              // DELETE POST?
+            </h2>
+          </div>
+          <div class="px-6 py-5 flex flex-col gap-5">
+            <p class="font-black uppercase tracking-widest text-white/80 text-sm">
+              This cannot be undone.
+            </p>
+            <div class="flex gap-3 justify-end border-t-[3px] border-white/30 pt-4">
+              <button
+                phx-click="cancel_delete"
+                class="font-black uppercase text-xs tracking-widest px-4 py-2 border-[2px] border-white text-white hover:bg-white hover:text-[#ff0000] transition-colors duration-150"
+              >
+                CANCEL
+              </button>
+              <button
+                phx-click="delete"
+                class="font-black uppercase text-xs tracking-widest px-4 py-2 border-[2px] border-black bg-black text-white hover:bg-white hover:text-black transition-colors duration-150"
+              >
+                DELETE →
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </Layouts.app>
