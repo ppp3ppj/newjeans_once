@@ -10,6 +10,8 @@ defmodule NewjeansOnce.Board do
     Repo.all(from m in Message, order_by: [desc: m.inserted_at])
   end
 
+  def count_messages, do: Repo.aggregate(Message, :count)
+
   def get_message!(id), do: Repo.get!(Message, id)
 
   def create_message(attrs) do

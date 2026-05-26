@@ -32,6 +32,7 @@ defmodule NewjeansOnceWeb.Layouts do
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
   attr :fan_count, :integer, default: nil
+  attr :post_count, :integer, default: nil
 
   slot :inner_block, required: true
 
@@ -48,6 +49,16 @@ defmodule NewjeansOnceWeb.Layouts do
           </span>
         </a>
         <div class="flex items-center gap-2 sm:gap-3">
+          <div
+            :if={@post_count != nil}
+            class="flex items-center gap-2 border-[2px] border-white bg-[#ffff00] px-3 py-1.5"
+          >
+            <span class="text-base leading-none select-none">📝</span>
+            <span class="font-black text-sm text-black tabular-nums leading-none">{@post_count}</span>
+            <span class="font-black uppercase text-[10px] text-black tracking-widest hidden sm:block leading-none">
+              {if @post_count == 1, do: "POST", else: "POSTS"}
+            </span>
+          </div>
           <div
             :if={@fan_count != nil}
             class="flex items-center gap-2 border-[2px] border-white bg-[#00ffff] px-3 py-1.5"

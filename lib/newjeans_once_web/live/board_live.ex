@@ -16,6 +16,7 @@ defmodule NewjeansOnceWeb.BoardLive do
     {:ok,
      socket
      |> assign(:fan_count, count_fans())
+     |> assign(:post_count, Board.count_messages())
      |> assign(:show_new_modal, false)
      |> assign(:new_form, to_form(Board.change_message(%Message{})))
      |> assign(:editing_id, nil)
@@ -26,14 +27,22 @@ defmodule NewjeansOnceWeb.BoardLive do
   defp count_fans, do: Presence.list(@presence_topic) |> map_size()
 
   # PubSub — real-time sync across all browsers
-  def handle_info({:created, msg}, socket),
-    do: {:noreply, stream_insert(socket, :messages, msg, at: 0)}
+  def handle_info({:created, msg}, socket) do
+    {:noreply,
+     socket
+     |> update(:post_count, &(&1 + 1))
+     |> stream_insert(:messages, msg, at: 0)}
+  end
 
   def handle_info({:updated, msg}, socket),
     do: {:noreply, stream_insert(socket, :messages, msg)}
 
-  def handle_info({:deleted, msg}, socket),
-    do: {:noreply, stream_delete(socket, :messages, msg)}
+  def handle_info({:deleted, msg}, socket) do
+    {:noreply,
+     socket
+     |> update(:post_count, &(&1 - 1))
+     |> stream_delete(:messages, msg)}
+  end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket),
     do: {:noreply, assign(socket, :fan_count, count_fans())}
@@ -95,7 +104,7 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} fan_count={@fan_count}>
+    <Layouts.app flash={@flash} fan_count={@fan_count} post_count={@post_count}>
       <div class="max-w-3xl mx-auto flex flex-col gap-8">
         <%!-- Hero header + action row --%>
         <div class="pt-4 pb-2 flex items-end justify-between gap-4">
