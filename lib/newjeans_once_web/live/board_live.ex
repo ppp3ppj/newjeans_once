@@ -24,6 +24,7 @@ defmodule NewjeansOnceWeb.BoardLive do
      |> assign(:delete_msg, nil)
      |> assign(:star_clicks, 0)
      |> assign(:show_nuke_modal, false)
+     |> assign(:show_info_modal, false)
      |> stream(:messages, Board.list_messages())}
   end
 
@@ -106,6 +107,18 @@ defmodule NewjeansOnceWeb.BoardLive do
     end
   end
 
+  # Info modal
+  def handle_event("open_info_modal", _, socket),
+    do: {:noreply, assign(socket, :show_info_modal, true)}
+
+  def handle_event("close_info_modal", _, socket),
+    do: {:noreply, assign(socket, :show_info_modal, false)}
+
+  # Let it crash — OTP supervisor restarts this process in milliseconds
+  def handle_event("crash", _, _socket) do
+    raise "intentional crash — watch OTP restart this process"
+  end
+
   # Secret nuke — triggered by clicking ★ sticker 3 times
   def handle_event("star_click", _, socket) do
     clicks = socket.assigns.star_clicks + 1
@@ -165,7 +178,7 @@ defmodule NewjeansOnceWeb.BoardLive do
             phx-click="open_new_modal"
             class="btn btn-neutral shrink-0 flex items-center gap-2 px-6"
           >
-            <span class="text-lg">✚</span> NEW POST
+            <span class="text-xl font-black leading-none">+</span> NEW POST
           </button>
         </div>
 
@@ -395,6 +408,86 @@ defmodule NewjeansOnceWeb.BoardLive do
           </div>
         </div>
       </div>
+      <%!-- ── INFO MODAL (click version badge) ────────────────── --%>
+      <div
+        :if={@show_info_modal}
+        id="info-modal-overlay"
+        phx-hook="ModalScrollLock"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div class="absolute inset-0 bg-black/70" phx-click="close_info_modal"></div>
+        <div class="relative z-10 w-full max-w-sm border-[4px] border-white bg-black shadow-[8px_8px_0_#ffffff]">
+          <%!-- Header --%>
+          <div class="flex items-center justify-between border-b-[4px] border-white px-6 py-4">
+            <h2 class="font-black text-xl uppercase tracking-widest text-white">
+              // APP INFO
+            </h2>
+            <button
+              phx-click="close_info_modal"
+              class="font-black text-xl text-white hover:text-[#ff0000] transition-colors leading-none"
+            >
+              ✕
+            </button>
+          </div>
+          <%!-- Version block --%>
+          <div class="px-6 pt-6 pb-4 flex flex-col gap-4">
+            <div class="border-l-[6px] border-[#ffff00] pl-4">
+              <p class="font-black uppercase tracking-widest text-white/50 text-[10px]">APP</p>
+              <p class="font-black text-4xl text-white font-mono tracking-tight leading-tight">
+                FANWALL
+              </p>
+              <p class="font-mono font-black text-[#ffff00] text-lg tracking-widest">
+                v{Application.spec(:newjeans_once, :vsn)}
+              </p>
+            </div>
+            <%!-- Stack details --%>
+            <div class="border-[2px] border-white/20 divide-y divide-white/20">
+              <div class="flex items-center justify-between px-4 py-2">
+                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">Phoenix</span>
+                <code class="font-mono font-black text-xs text-white">
+                  v{Application.spec(:phoenix, :vsn)}
+                </code>
+              </div>
+              <div class="flex items-center justify-between px-4 py-2">
+                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">LiveView</span>
+                <code class="font-mono font-black text-xs text-white">
+                  v{Application.spec(:phoenix_live_view, :vsn)}
+                </code>
+              </div>
+              <div class="flex items-center justify-between px-4 py-2">
+                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">Elixir</span>
+                <code class="font-mono font-black text-xs text-white">
+                  v{System.version()}
+                </code>
+              </div>
+              <div class="flex items-center justify-between px-4 py-2">
+                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">OTP</span>
+                <code class="font-mono font-black text-xs text-white">
+                  {to_string(:erlang.system_info(:otp_release))}
+                </code>
+              </div>
+            </div>
+            <%!-- Crash button --%>
+            <div class="border-t-[3px] border-white/20 pt-4">
+              <p class="font-black uppercase text-[10px] tracking-widest text-white/30 mb-3">
+                OTP SUPERVISION DEMO
+              </p>
+              <button
+                phx-click="crash"
+                class="w-full font-black uppercase text-xs tracking-widest px-4 py-3 border-[3px] border-white text-white
+                       bg-[repeating-linear-gradient(45deg,#1a1a1a,#1a1a1a_6px,#000_6px,#000_12px)]
+                       hover:bg-[repeating-linear-gradient(45deg,#ff0000,#ff0000_6px,#000_6px,#000_12px)]
+                       hover:border-[#ff0000] hover:text-white
+                       transition-all duration-150 shadow-[3px_3px_0_#ffffff]
+                       hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-[5px_5px_0_#ff0000]"
+              >
+                ! CRASH THIS PROCESS →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <%!-- ── NUKE MODAL (secret: click ★ × 3) ───────────────── --%>
       <div
         :if={@show_nuke_modal}

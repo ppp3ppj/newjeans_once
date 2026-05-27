@@ -40,17 +40,21 @@ defmodule NewjeansOnceWeb.Layouts do
     ~H"""
     <header class="sticky top-0 z-50 bg-black text-white border-b-[6px] border-[#ff0000]">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-        <a href="/" class="flex items-center gap-3 shrink-0">
-          <div class="w-10 h-10 bg-[#ff0000] border-[3px] border-white flex items-center justify-center font-black text-white text-xs leading-none tracking-tighter">
-            FW
-          </div>
-          <span class="font-black text-base uppercase tracking-widest hidden sm:block">
-            FanWall
-          </span>
-          <code class="hidden sm:block font-mono font-black text-[10px] tracking-widest text-white/50 border-[2px] border-white/30 px-1.5 py-0.5">
-            v{Application.spec(:newjeans_once, :vsn)}
-          </code>
-        </a>
+        <div class="flex items-center gap-3 shrink-0">
+          <a href="/" class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-[#ff0000] border-[3px] border-white flex items-center justify-center font-black text-white text-xs leading-none tracking-tighter">
+              FW
+            </div>
+            <span class="font-black text-base uppercase tracking-widest hidden sm:block">
+              FanWall
+            </span>
+          </a>
+          <code
+            class="hidden sm:block font-mono font-black text-[10px] tracking-widest text-white/50 border-[2px] border-white/30 px-1.5 py-0.5 select-none"
+            phx-click="open_info_modal"
+            title="App info"
+          >v{Application.spec(:newjeans_once, :vsn)}</code>
+        </div>
         <div class="flex items-center gap-2 sm:gap-3">
           <div
             :if={@post_count != nil}
