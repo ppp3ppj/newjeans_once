@@ -45,6 +45,50 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
+// Confetti — triggered only for the poster's own browser via push_event (not PubSub)
+function launchConfetti() {
+  const canvas = document.createElement("canvas")
+  canvas.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999"
+  document.body.appendChild(canvas)
+  const ctx = canvas.getContext("2d")
+  canvas.width = window.innerWidth
+  canvas.height = window.innerHeight
+
+  const colors = ["#ffff00", "#00ffff", "#ff0000", "#ff6600", "#ffffff"]
+  const pieces = Array.from({length: 100}, () => ({
+    x: Math.random() * canvas.width,
+    y: -10 - Math.random() * canvas.height * 0.3,
+    w: 8 + Math.random() * 8,
+    h: 6 + Math.random() * 6,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    vx: (Math.random() - 0.5) * 5,
+    vy: 3 + Math.random() * 5,
+    vr: (Math.random() - 0.5) * 0.25,
+    rotation: Math.random() * Math.PI * 2,
+  }))
+
+  let frame
+  const animate = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    let alive = false
+    pieces.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.rotation += p.vr
+      if (p.y < canvas.height + 20) alive = true
+      ctx.save()
+      ctx.translate(p.x, p.y)
+      ctx.rotate(p.rotation)
+      ctx.fillStyle = p.color
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h)
+      ctx.restore()
+    })
+    alive ? (frame = requestAnimationFrame(animate)) : canvas.remove()
+  }
+  frame = requestAnimationFrame(animate)
+  setTimeout(() => { cancelAnimationFrame(frame); canvas.remove() }, 3500)
+}
+
+window.addEventListener("phx:confetti", launchConfetti)
+
 // Reaction counts — server pushes only the new counts, JS patches the DOM directly
 const REACTION_FILLED = ["border-black", "dark:border-white", "bg-black", "dark:bg-white", "shadow-[3px_3px_0_#000]", "dark:shadow-[3px_3px_0_#fff]"]
 const REACTION_EMPTY  = ["border-black/20", "dark:border-white/20", "hover:border-black", "dark:hover:border-white", "hover:shadow-[3px_3px_0_#000]", "dark:hover:shadow-[3px_3px_0_#fff]"]

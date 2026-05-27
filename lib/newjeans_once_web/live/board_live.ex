@@ -112,10 +112,9 @@ defmodule NewjeansOnceWeb.BoardLive do
         Presence.update(self(), @presence_topic, socket.id, %{typing: false})
 
         {:noreply,
-         assign(socket,
-           show_new_modal: false,
-           new_form: to_form(Board.change_message(%Message{}))
-         )}
+         socket
+         |> assign(show_new_modal: false, new_form: to_form(Board.change_message(%Message{})))
+         |> push_event("confetti", %{})}
 
       {:error, cs} ->
         {:noreply, assign(socket, :new_form, to_form(cs))}
