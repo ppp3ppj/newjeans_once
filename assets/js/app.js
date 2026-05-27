@@ -45,6 +45,31 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
+// Reaction counts — server pushes only the new counts, JS patches the DOM directly
+const REACTION_FILLED = ["border-black", "dark:border-white", "bg-black", "dark:bg-white", "shadow-[3px_3px_0_#000]", "dark:shadow-[3px_3px_0_#fff]"]
+const REACTION_EMPTY  = ["border-black/20", "dark:border-white/20", "hover:border-black", "dark:hover:border-white", "hover:shadow-[3px_3px_0_#000]", "dark:hover:shadow-[3px_3px_0_#fff]"]
+
+window.addEventListener("phx:reactions:updated", ({detail: {post_id, counts}}) => {
+  for (const [type, count] of Object.entries(counts)) {
+    const btn     = document.getElementById(`rxn-${post_id}-${type}`)
+    const countEl = document.getElementById(`rxn-count-${post_id}-${type}`)
+    if (!btn || !countEl) continue
+
+    countEl.textContent = count
+    if (count > 0) {
+      countEl.classList.remove("hidden", "text-base-content/40")
+      countEl.classList.add("text-white", "dark:text-black")
+      btn.classList.remove(...REACTION_EMPTY)
+      btn.classList.add(...REACTION_FILLED)
+    } else {
+      countEl.classList.add("hidden")
+      countEl.classList.remove("text-white", "dark:text-black")
+      btn.classList.remove(...REACTION_FILLED)
+      btn.classList.add(...REACTION_EMPTY)
+    }
+  }
+})
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 

@@ -3,14 +3,20 @@ defmodule NewjeansOnceWeb.BoardLive do
   alias NewjeansOnce.Board
   alias NewjeansOnce.Board.Message
   alias NewjeansOnce.Presence
+  alias NewjeansOnce.Reactions
 
   @presence_topic "bunnies:lobby"
+  @reaction_types ~w(star cat bunny)
 
   def mount(_params, _session, socket) do
+    messages = Board.list_messages()
+    post_ids = Enum.map(messages, & &1.id)
+
     if connected?(socket) do
       Board.subscribe()
       {:ok, _} = Presence.track(self(), @presence_topic, socket.id, %{typing: false})
       Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, @presence_topic)
+      Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, "reactions")
     end
 
     {:ok,
@@ -19,6 +25,7 @@ defmodule NewjeansOnceWeb.BoardLive do
      |> assign(:typing_count, 0)
      |> assign(:toast, nil)
      |> assign(:post_count, Board.count_messages())
+     |> assign(:reactions, Reactions.get_all(post_ids))
      |> assign(:show_new_modal, false)
      |> assign(:new_form, to_form(Board.change_message(%Message{})))
      |> assign(:editing_id, nil)
@@ -27,7 +34,7 @@ defmodule NewjeansOnceWeb.BoardLive do
      |> assign(:star_clicks, 0)
      |> assign(:show_nuke_modal, false)
      |> assign(:show_info_modal, false)
-     |> stream(:messages, Board.list_messages())}
+     |> stream(:messages, messages)}
   end
 
   defp count_fans, do: Presence.list(@presence_topic) |> map_size()
@@ -45,6 +52,7 @@ defmodule NewjeansOnceWeb.BoardLive do
     {:noreply,
      socket
      |> assign(:toast, msg)
+     |> update(:reactions, &Map.put(&1, msg.id, %{star: 0, cat: 0, bunny: 0}))
      |> update(:post_count, &(&1 + 1))
      |> stream_insert(:messages, msg, at: 0)}
   end
@@ -58,8 +66,16 @@ defmodule NewjeansOnceWeb.BoardLive do
   def handle_info({:deleted, msg}, socket) do
     {:noreply,
      socket
+     |> update(:reactions, &Map.delete(&1, msg.id))
      |> update(:post_count, &(&1 - 1))
      |> stream_delete(:messages, msg)}
+  end
+
+  def handle_info({:reaction_updated, post_id, counts}, socket) do
+    {:noreply,
+     socket
+     |> update(:reactions, &Map.put(&1, post_id, counts))
+     |> push_event("reactions:updated", %{post_id: post_id, counts: counts})}
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket),
@@ -69,6 +85,7 @@ defmodule NewjeansOnceWeb.BoardLive do
     {:noreply,
      socket
      |> assign(:post_count, 0)
+     |> assign(:reactions, %{})
      |> stream(:messages, [], reset: true)}
   end
 
@@ -134,6 +151,15 @@ defmodule NewjeansOnceWeb.BoardLive do
     end
   end
 
+  # Reactions
+  def handle_event("react", %{"id" => id, "type" => type}, socket)
+      when type in @reaction_types do
+    Reactions.react(id, String.to_existing_atom(type))
+    {:noreply, socket}
+  end
+
+  def handle_event("react", _, socket), do: {:noreply, socket}
+
   # Info modal
   def handle_event("open_info_modal", _, socket),
     do: {:noreply, assign(socket, :show_info_modal, true)}
@@ -167,6 +193,7 @@ defmodule NewjeansOnceWeb.BoardLive do
      socket
      |> assign(:show_nuke_modal, false)
      |> assign(:post_count, 0)
+     |> assign(:reactions, %{})
      |> stream(:messages, [], reset: true)}
   end
 
@@ -256,7 +283,7 @@ defmodule NewjeansOnceWeb.BoardLive do
               src={msg.photo_url}
               class="w-full h-48 object-cover border-b-[4px] border-black dark:border-white"
             />
-            <div class="p-5 flex flex-col gap-2">
+            <div class="p-5 flex flex-col gap-3">
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <p class="font-black text-xl uppercase tracking-wide leading-tight">
@@ -300,10 +327,37 @@ defmodule NewjeansOnceWeb.BoardLive do
                   </div>
                 </div>
               </div>
-              <p class="text-base-content/80 leading-relaxed mt-1 border-l-[4px] border-[#ffff00] pl-3">
+              <p class="text-base-content/80 leading-relaxed border-l-[4px] border-[#ffff00] pl-3">
                 {msg.description}
               </p>
-              <div class="mt-2 pt-2 border-t-[2px] border-black/10 dark:border-white/10">
+              <%!-- Reactions --%>
+              <% r = @reactions[msg.id] || %{star: 0, cat: 0, bunny: 0} %>
+              <div class="flex items-center gap-2 pt-2 border-t-[2px] border-black/10 dark:border-white/10">
+                <button
+                  :for={{type, label} <- [star: "⭐️", cat: "🐱", bunny: "🐰"]}
+                  id={"rxn-#{msg.id}-#{type}"}
+                  phx-click="react"
+                  phx-value-id={msg.id}
+                  phx-value-type={type}
+                  class={[
+                    "flex items-center gap-1.5 px-3 py-1.5 border-[2px] transition-all duration-150 hover:-translate-y-[2px] select-none",
+                    if(Map.get(r, type, 0) > 0,
+                      do: "border-black dark:border-white bg-black dark:bg-white shadow-[3px_3px_0_#000] dark:shadow-[3px_3px_0_#fff]",
+                      else: "border-black/20 dark:border-white/20 hover:border-black dark:hover:border-white hover:shadow-[3px_3px_0_#000] dark:hover:shadow-[3px_3px_0_#fff]"
+                    )
+                  ]}
+                >
+                  <span class="text-base leading-none">{label}</span>
+                  <span
+                    id={"rxn-count-#{msg.id}-#{type}"}
+                    class={[
+                      "font-black text-[11px] tabular-nums leading-none",
+                      if(Map.get(r, type, 0) > 0, do: "text-white dark:text-black", else: "hidden")
+                    ]}
+                  >{Map.get(r, type, 0)}</span>
+                </button>
+              </div>
+              <div class="border-t-[2px] border-black/10 dark:border-white/10 pt-1">
                 <span class="text-[10px] font-black uppercase tracking-widest text-base-content/40">
                   {Calendar.strftime(msg.inserted_at, "%d %b %Y · %H:%M")}
                 </span>

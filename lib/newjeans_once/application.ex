@@ -15,6 +15,7 @@ defmodule NewjeansOnce.Application do
       {DNSCluster, query: Application.get_env(:newjeans_once, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: NewjeansOnce.PubSub},
       NewjeansOnce.Presence,
+      NewjeansOnce.Reactions,
       # Start a worker by calling: NewjeansOnce.Worker.start_link(arg)
       # {NewjeansOnce.Worker, arg},
       # Start to serve requests, typically the last entry
