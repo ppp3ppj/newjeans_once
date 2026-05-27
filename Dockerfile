@@ -69,10 +69,12 @@ RUN mkdir -p /storage && chown nobody:root /storage
 
 USER nobody
 
+ARG PHX_HOST=localhost
+
 ENV PHX_SERVER=true
 ENV PORT=80
 ENV DATABASE_PATH=/storage/newjeans_once.db
-ENV PHX_HOST=localhost
+ENV PHX_HOST=${PHX_HOST}
 
 EXPOSE 80
 
