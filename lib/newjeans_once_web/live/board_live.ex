@@ -9,13 +9,15 @@ defmodule NewjeansOnceWeb.BoardLive do
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Board.subscribe()
-      {:ok, _} = Presence.track(self(), @presence_topic, socket.id, %{})
+      {:ok, _} = Presence.track(self(), @presence_topic, socket.id, %{typing: false})
       Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, @presence_topic)
     end
 
     {:ok,
      socket
      |> assign(:fan_count, count_fans())
+     |> assign(:typing_count, 0)
+     |> assign(:toast, nil)
      |> assign(:post_count, Board.count_messages())
      |> assign(:show_new_modal, false)
      |> assign(:new_form, to_form(Board.change_message(%Message{})))
@@ -30,13 +32,25 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   defp count_fans, do: Presence.list(@presence_topic) |> map_size()
 
+  defp count_typing do
+    Presence.list(@presence_topic)
+    |> Map.values()
+    |> Enum.count(fn %{metas: [meta | _]} -> meta.typing end)
+  end
+
   # PubSub — real-time sync across all browsers
   def handle_info({:created, msg}, socket) do
+    Process.send_after(self(), :clear_toast, 4000)
+
     {:noreply,
      socket
+     |> assign(:toast, msg)
      |> update(:post_count, &(&1 + 1))
      |> stream_insert(:messages, msg, at: 0)}
   end
+
+  def handle_info(:clear_toast, socket),
+    do: {:noreply, assign(socket, :toast, nil)}
 
   def handle_info({:updated, msg}, socket),
     do: {:noreply, stream_insert(socket, :messages, msg)}
@@ -49,7 +63,7 @@ defmodule NewjeansOnceWeb.BoardLive do
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket),
-    do: {:noreply, assign(socket, :fan_count, count_fans())}
+    do: {:noreply, socket |> assign(:fan_count, count_fans()) |> assign(:typing_count, count_typing())}
 
   def handle_info({:nuked}, socket) do
     {:noreply,
@@ -59,11 +73,15 @@ defmodule NewjeansOnceWeb.BoardLive do
   end
 
   # New-post modal
-  def handle_event("open_new_modal", _, socket),
-    do: {:noreply, assign(socket, :show_new_modal, true)}
+  def handle_event("open_new_modal", _, socket) do
+    Presence.update(self(), @presence_topic, socket.id, %{typing: true})
+    {:noreply, assign(socket, :show_new_modal, true)}
+  end
 
-  def handle_event("close_new_modal", _, socket),
-    do: {:noreply, assign(socket, show_new_modal: false, new_form: to_form(Board.change_message(%Message{})))}
+  def handle_event("close_new_modal", _, socket) do
+    Presence.update(self(), @presence_topic, socket.id, %{typing: false})
+    {:noreply, assign(socket, show_new_modal: false, new_form: to_form(Board.change_message(%Message{})))}
+  end
 
   # Create
   def handle_event("validate_new", %{"message" => p}, socket) do
@@ -74,6 +92,8 @@ defmodule NewjeansOnceWeb.BoardLive do
   def handle_event("save_new", %{"message" => p}, socket) do
     case Board.create_message(p) do
       {:ok, _} ->
+        Presence.update(self(), @presence_topic, socket.id, %{typing: false})
+
         {:noreply,
          assign(socket,
            show_new_modal: false,
@@ -87,6 +107,7 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   # Edit
   def handle_event("edit", %{"id" => id}, socket) do
+    Presence.update(self(), @presence_topic, socket.id, %{typing: true})
     msg = Board.get_message!(id)
 
     {:noreply,
@@ -95,15 +116,21 @@ defmodule NewjeansOnceWeb.BoardLive do
      |> assign(:edit_form, to_form(Board.change_message(msg)))}
   end
 
-  def handle_event("cancel_edit", _, socket),
-    do: {:noreply, assign(socket, editing_id: nil, edit_form: nil)}
+  def handle_event("cancel_edit", _, socket) do
+    Presence.update(self(), @presence_topic, socket.id, %{typing: false})
+    {:noreply, assign(socket, editing_id: nil, edit_form: nil)}
+  end
 
   def handle_event("save_edit", %{"message" => p}, socket) do
     msg = Board.get_message!(socket.assigns.editing_id)
 
     case Board.update_message(msg, p) do
-      {:ok, _} -> {:noreply, assign(socket, editing_id: nil, edit_form: nil)}
-      {:error, cs} -> {:noreply, assign(socket, :edit_form, to_form(cs))}
+      {:ok, _} ->
+        Presence.update(self(), @presence_topic, socket.id, %{typing: false})
+        {:noreply, assign(socket, editing_id: nil, edit_form: nil)}
+
+      {:error, cs} ->
+        {:noreply, assign(socket, :edit_form, to_form(cs))}
     end
   end
 
@@ -182,6 +209,17 @@ defmodule NewjeansOnceWeb.BoardLive do
           </button>
         </div>
 
+        <%!-- Typing indicator --%>
+        <div
+          :if={@typing_count > 0}
+          class="flex items-center gap-2 border-[2px] border-black dark:border-white bg-[#ff6600] px-3 py-1.5 w-fit -mt-4"
+        >
+          <span class="w-2 h-2 bg-black animate-pulse shrink-0"></span>
+          <span class="font-black uppercase text-[10px] tracking-widest text-black leading-none">
+            {@typing_count} {if @typing_count == 1, do: "BUNNY", else: "BUNNIES"} WRITING...
+          </span>
+        </div>
+
         <%!-- Live stream of posts --%>
         <div id="messages" phx-update="stream" class="flex flex-col gap-4">
           <div
@@ -203,7 +241,15 @@ defmodule NewjeansOnceWeb.BoardLive do
                 time: 150
               )
             }
-            class="border-[4px] border-black dark:border-white bg-base-100 overflow-hidden group shadow-[5px_5px_0_#000000] dark:shadow-[5px_5px_0_#ffffff] transition-all duration-150 hover:-translate-x-[3px] hover:-translate-y-[3px] hover:shadow-[8px_8px_0_#000000] dark:hover:shadow-[8px_8px_0_#ffffff]"
+            class={[
+              "border-[4px] bg-base-100 overflow-hidden group transition-all duration-150",
+              if(@editing_id == to_string(msg.id),
+                do:
+                  "border-[#00ffff] shadow-[5px_5px_0_#00ffff] -translate-x-[3px] -translate-y-[3px]",
+                else:
+                  "border-black dark:border-white shadow-[5px_5px_0_#000000] dark:shadow-[5px_5px_0_#ffffff] hover:-translate-x-[3px] hover:-translate-y-[3px] hover:shadow-[8px_8px_0_#000000] dark:hover:shadow-[8px_8px_0_#ffffff]"
+              )
+            ]}
           >
             <img
               :if={msg.photo_url && msg.photo_url != ""}
@@ -223,21 +269,35 @@ defmodule NewjeansOnceWeb.BoardLive do
                     <span class="text-[#ff0000] dark:text-[#ff6666]">{msg.author}</span>
                   </p>
                 </div>
-                <div class="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <button
-                    phx-click="edit"
-                    phx-value-id={msg.id}
-                    class="font-black uppercase text-[10px] tracking-widest px-2 py-1 border-[2px] border-black dark:border-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors duration-150"
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span
+                    :if={@editing_id == to_string(msg.id)}
+                    class="font-black uppercase text-[10px] tracking-widest px-2 py-1 bg-[#00ffff] border-[2px] border-black text-black"
                   >
-                    EDIT
-                  </button>
-                  <button
-                    phx-click="confirm_delete"
-                    phx-value-id={msg.id}
-                    class="font-black uppercase text-[10px] tracking-widest px-2 py-1 border-[2px] border-[#ff0000] text-[#ff0000] hover:bg-[#ff0000] hover:text-white transition-colors duration-150"
-                  >
-                    DEL
-                  </button>
+                    EDITING
+                  </span>
+                  <div class={[
+                    "flex gap-1.5",
+                    if(@editing_id == to_string(msg.id),
+                      do: "opacity-100",
+                      else: "opacity-0 group-hover:opacity-100 transition-opacity"
+                    )
+                  ]}>
+                    <button
+                      phx-click="edit"
+                      phx-value-id={msg.id}
+                      class="font-black uppercase text-[10px] tracking-widest px-2 py-1 border-[2px] border-black dark:border-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors duration-150"
+                    >
+                      EDIT
+                    </button>
+                    <button
+                      phx-click="confirm_delete"
+                      phx-value-id={msg.id}
+                      class="font-black uppercase text-[10px] tracking-widest px-2 py-1 border-[2px] border-[#ff0000] text-[#ff0000] hover:bg-[#ff0000] hover:text-white transition-colors duration-150"
+                    >
+                      DEL
+                    </button>
+                  </div>
                 </div>
               </div>
               <p class="text-base-content/80 leading-relaxed mt-1 border-l-[4px] border-[#ffff00] pl-3">
@@ -253,6 +313,26 @@ defmodule NewjeansOnceWeb.BoardLive do
         </div>
       </div>
 
+      <%!-- ── NEW POST TOAST (broadcast to all users) ───────────── --%>
+      <div
+        :if={@toast != nil}
+        id="new-post-toast"
+        phx-mounted={
+          JS.transition(
+            {"transition-all duration-300 ease-out",
+             "opacity-0 translate-y-4",
+             "opacity-100 translate-y-0"},
+            time: 300
+          )
+        }
+        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 border-[3px] border-black dark:border-white bg-[#ffff00] shadow-[5px_5px_0_#000000] dark:shadow-[5px_5px_0_#ffffff] px-5 py-3 whitespace-nowrap pointer-events-none"
+      >
+        <span class="w-2 h-2 bg-black animate-pulse shrink-0"></span>
+        <span class="font-black uppercase text-[11px] tracking-widest text-black">
+          // NEW POST BY {@toast.author}
+        </span>
+      </div>
+
       <%!-- ── NEW POST MODAL ─────────────────────────────────── --%>
       <div
         :if={@show_new_modal}
@@ -260,13 +340,7 @@ defmodule NewjeansOnceWeb.BoardLive do
         phx-hook="ModalScrollLock"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <%!-- Backdrop --%>
-        <div
-          class="absolute inset-0 bg-black/60"
-          phx-click="close_new_modal"
-        >
-        </div>
-        <%!-- Modal box --%>
+        <div class="absolute inset-0 bg-black/60" phx-click="close_new_modal"></div>
         <div class="relative z-10 w-full max-w-lg border-[4px] border-black dark:border-white bg-[#ffff00] dark:bg-[#111111] shadow-[8px_8px_0_#000000] dark:shadow-[8px_8px_0_#ffffff] max-h-[90vh] overflow-y-auto">
           <div class="flex items-center justify-between border-b-[4px] border-black dark:border-white px-6 py-4">
             <h2 class="font-black text-xl uppercase tracking-widest text-black dark:text-white">
@@ -322,17 +396,11 @@ defmodule NewjeansOnceWeb.BoardLive do
         phx-hook="ModalScrollLock"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
-        <%!-- Backdrop --%>
-        <div
-          class="absolute inset-0 bg-black/60"
-          phx-click="cancel_edit"
-        >
-        </div>
-        <%!-- Modal box --%>
+        <div class="absolute inset-0 bg-black/60" phx-click="cancel_edit"></div>
         <div class="relative z-10 w-full max-w-lg border-[4px] border-black dark:border-white bg-[#00ffff] shadow-[8px_8px_0_#000000] dark:shadow-[8px_8px_0_#ffffff] max-h-[90vh] overflow-y-auto">
           <div class="flex items-center justify-between border-b-[4px] border-black px-6 py-4">
             <h2 class="font-black text-xl uppercase tracking-widest text-black">
-              ✏ EDIT POST
+              // EDIT POST
             </h2>
             <button
               phx-click="cancel_edit"
@@ -363,6 +431,7 @@ defmodule NewjeansOnceWeb.BoardLive do
           </.form>
         </div>
       </div>
+
       <%!-- ── DELETE MODAL ─────────────────────────────────────── --%>
       <div
         :if={@delete_msg != nil}
@@ -378,7 +447,6 @@ defmodule NewjeansOnceWeb.BoardLive do
             </h2>
           </div>
           <div class="px-6 py-5 flex flex-col gap-4">
-            <%!-- Post preview --%>
             <div class="border-[3px] border-white/50 bg-white/10 px-4 py-3 flex flex-col gap-1">
               <p class="font-black uppercase tracking-wide text-white leading-tight line-clamp-2">
                 {@delete_msg.title}
@@ -408,6 +476,7 @@ defmodule NewjeansOnceWeb.BoardLive do
           </div>
         </div>
       </div>
+
       <%!-- ── INFO MODAL (click version badge) ────────────────── --%>
       <div
         :if={@show_info_modal}
@@ -417,7 +486,6 @@ defmodule NewjeansOnceWeb.BoardLive do
       >
         <div class="absolute inset-0 bg-black/70" phx-click="close_info_modal"></div>
         <div class="relative z-10 w-full max-w-sm border-[4px] border-white bg-black shadow-[8px_8px_0_#ffffff]">
-          <%!-- Header --%>
           <div class="flex items-center justify-between border-b-[4px] border-white px-6 py-4">
             <h2 class="font-black text-xl uppercase tracking-widest text-white">
               // APP INFO
@@ -429,7 +497,6 @@ defmodule NewjeansOnceWeb.BoardLive do
               ✕
             </button>
           </div>
-          <%!-- Version block --%>
           <div class="px-6 pt-6 pb-4 flex flex-col gap-4">
             <div class="border-l-[6px] border-[#ffff00] pl-4">
               <p class="font-black uppercase tracking-widest text-white/50 text-[10px]">APP</p>
@@ -440,34 +507,40 @@ defmodule NewjeansOnceWeb.BoardLive do
                 v{Application.spec(:newjeans_once, :vsn)}
               </p>
             </div>
-            <%!-- Stack details --%>
             <div class="border-[2px] border-white/20 divide-y divide-white/20">
               <div class="flex items-center justify-between px-4 py-2">
-                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">Phoenix</span>
+                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">
+                  Phoenix
+                </span>
                 <code class="font-mono font-black text-xs text-white">
                   v{Application.spec(:phoenix, :vsn)}
                 </code>
               </div>
               <div class="flex items-center justify-between px-4 py-2">
-                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">LiveView</span>
+                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">
+                  LiveView
+                </span>
                 <code class="font-mono font-black text-xs text-white">
                   v{Application.spec(:phoenix_live_view, :vsn)}
                 </code>
               </div>
               <div class="flex items-center justify-between px-4 py-2">
-                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">Elixir</span>
+                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">
+                  Elixir
+                </span>
                 <code class="font-mono font-black text-xs text-white">
                   v{System.version()}
                 </code>
               </div>
               <div class="flex items-center justify-between px-4 py-2">
-                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">OTP</span>
+                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">
+                  OTP
+                </span>
                 <code class="font-mono font-black text-xs text-white">
                   {to_string(:erlang.system_info(:otp_release))}
                 </code>
               </div>
             </div>
-            <%!-- Crash button --%>
             <div class="border-t-[3px] border-white/20 pt-4">
               <p class="font-black uppercase text-[10px] tracking-widest text-white/30 mb-3">
                 OTP SUPERVISION DEMO
