@@ -72,6 +72,7 @@ USER nobody
 ENV PHX_SERVER=true
 ENV PORT=80
 ENV DATABASE_PATH=/storage/newjeans_once.db
+ENV PHX_HOST=localhost
 
 EXPOSE 80
 
