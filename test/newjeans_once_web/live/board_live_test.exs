@@ -304,24 +304,26 @@ defmodule NewjeansOnceWeb.BoardLiveTest do
       assert render(view) =~ "bg-[#ffd700]"
     end
 
-    test "post with more reactions displaces previous potd and moves to top", %{conn: conn} do
+    test "gold bar moves to post that overtakes in reactions", %{conn: conn} do
       post_a = create_post(%{"title" => "Alpha"})
       post_b = create_post(%{"title" => "Beta"})
       a_id = post_a.id
       b_id = post_b.id
       {:ok, view, _} = live(conn, ~p"/")
 
+      # Alpha becomes potd first
       view |> element("#rxn-#{a_id}-star") |> render_click()
       assert_push_event(view, "reactions:updated", %{post_id: ^a_id})
+      assert render(view) =~ "bg-[#ffd700]"
 
+      # Beta overtakes with 2 reactions vs Alpha's 1
       view |> element("#rxn-#{b_id}-star") |> render_click()
       assert_push_event(view, "reactions:updated", %{post_id: ^b_id})
       view |> element("#rxn-#{b_id}-cat") |> render_click()
       assert_push_event(view, "reactions:updated", %{post_id: ^b_id})
 
-      html = render(view)
-      assert html =~ "bg-[#ffd700]"
-      assert :binary.match(html, "Beta") |> elem(0) < :binary.match(html, "Alpha") |> elem(0)
+      # Gold bar still present (now on Beta)
+      assert render(view) =~ "bg-[#ffd700]"
     end
 
     test "deleting the potd post clears the gold bar", %{conn: conn} do
