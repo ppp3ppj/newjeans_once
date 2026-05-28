@@ -289,4 +289,111 @@ defmodule NewjeansOnceWeb.BoardLiveTest do
       assert render(view) =~ to_string(initial_count - 1)
     end
   end
+
+  # ── Post of the day ──────────────────────────────────────────────────────────
+
+  describe "post of the day" do
+    test "post with first reaction gets gold bar", %{conn: conn} do
+      post = create_post()
+      post_id = post.id
+      {:ok, view, _} = live(conn, ~p"/")
+
+      view |> element("#rxn-#{post_id}-star") |> render_click()
+      assert_push_event(view, "reactions:updated", %{post_id: ^post_id})
+
+      assert render(view) =~ "bg-[#ffd700]"
+    end
+
+    test "post with more reactions displaces previous potd and moves to top", %{conn: conn} do
+      post_a = create_post(%{"title" => "Alpha"})
+      post_b = create_post(%{"title" => "Beta"})
+      a_id = post_a.id
+      b_id = post_b.id
+      {:ok, view, _} = live(conn, ~p"/")
+
+      view |> element("#rxn-#{a_id}-star") |> render_click()
+      assert_push_event(view, "reactions:updated", %{post_id: ^a_id})
+
+      view |> element("#rxn-#{b_id}-star") |> render_click()
+      assert_push_event(view, "reactions:updated", %{post_id: ^b_id})
+      view |> element("#rxn-#{b_id}-cat") |> render_click()
+      assert_push_event(view, "reactions:updated", %{post_id: ^b_id})
+
+      html = render(view)
+      assert html =~ "bg-[#ffd700]"
+      assert :binary.match(html, "Beta") |> elem(0) < :binary.match(html, "Alpha") |> elem(0)
+    end
+
+    test "deleting the potd post clears the gold bar", %{conn: conn} do
+      post = create_post()
+      post_id = post.id
+      {:ok, view, _} = live(conn, ~p"/")
+
+      view |> element("#rxn-#{post_id}-star") |> render_click()
+      assert_push_event(view, "reactions:updated", %{post_id: ^post_id})
+      assert render(view) =~ "bg-[#ffd700]"
+
+      view |> element("button[phx-click='confirm_delete'][phx-value-id='#{post_id}']") |> render_click()
+      view |> element("button[phx-click='delete']") |> render_click()
+
+      refute render(view) =~ "bg-[#ffd700]"
+    end
+  end
+
+  # ── Guest name color ─────────────────────────────────────────────────────────
+
+  describe "guest name color" do
+    test "connected user's name is rendered with an hsl color", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/")
+      assert html =~ "hsl("
+    end
+
+    test "guest color is included in the posting-as badge", %{conn: conn} do
+      {:ok, view, _} = live(conn, ~p"/")
+      view |> element("button[phx-click='open_new_modal']") |> render_click()
+      assert render(view) =~ "hsl("
+    end
+  end
+
+  # ── Confetti milestone ───────────────────────────────────────────────────────
+
+  describe "confetti on reaction milestone" do
+    test "confetti fires when post reaches 10 total reactions", %{conn: conn} do
+      post = create_post()
+      post_id = post.id
+      {:ok, view, _} = live(conn, ~p"/")
+
+      for _ <- 1..10 do
+        view |> element("#rxn-#{post_id}-star") |> render_click()
+      end
+
+      assert_push_event(view, "confetti", %{})
+    end
+
+    test "confetti fires for all connected users at the milestone", %{conn: conn} do
+      post = create_post()
+      post_id = post.id
+      {:ok, view_a, _} = live(conn, ~p"/")
+      {:ok, view_b, _} = live(conn, ~p"/")
+
+      for _ <- 1..10 do
+        view_a |> element("#rxn-#{post_id}-star") |> render_click()
+      end
+
+      assert_push_event(view_a, "confetti", %{})
+      assert_push_event(view_b, "confetti", %{})
+    end
+
+    test "confetti does not fire before 10 reactions", %{conn: conn} do
+      post = create_post()
+      post_id = post.id
+      {:ok, view, _} = live(conn, ~p"/")
+
+      for _ <- 1..9 do
+        view |> element("#rxn-#{post_id}-star") |> render_click()
+      end
+
+      refute_push_event(view, "confetti", %{})
+    end
+  end
 end
