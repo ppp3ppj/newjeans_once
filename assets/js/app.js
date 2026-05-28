@@ -28,7 +28,7 @@ import topbar from "../vendor/topbar"
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 
 // Single source of truth for cursor visibility — shared between CursorToggle and CursorTracker
-let cursorEnabled = localStorage.getItem("cursor_enabled") === "true"
+let cursorEnabled = localStorage.getItem("cursor_enabled") !== "false"
 
 // Deterministic color from name — same name always gives the same color
 const CURSOR_COLORS = ["#ff6600","#00ffff","#ffff00","#ff69b4","#00ff99","#bf5fff"]
