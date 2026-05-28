@@ -32,11 +32,18 @@ const Hooks = {
     mounted()   { document.body.classList.add("overflow-hidden") },
     destroyed() { document.body.classList.remove("overflow-hidden") },
   },
+  GuestName: {
+    mounted() {
+      this.handleEvent("assign_name", ({name}) => {
+        localStorage.setItem("guest_name", name)
+      })
+    }
+  },
 }
 
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken},
+  params: () => ({_csrf_token: csrfToken, guest_name: localStorage.getItem("guest_name") || ""}),
   hooks: {...colocatedHooks, ...Hooks},
 })
 
