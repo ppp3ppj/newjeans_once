@@ -566,7 +566,7 @@ defmodule NewjeansOnceWeb.BoardLive do
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <div class="absolute inset-0 bg-black/60" phx-click="cancel_edit"></div>
-        <div class="relative z-10 w-full max-w-lg border-[4px] border-black dark:border-white bg-[#00ffff] shadow-[8px_8px_0_#000000] dark:shadow-[8px_8px_0_#ffffff] max-h-[90vh] overflow-y-auto">
+        <div data-theme="light" class="relative z-10 w-full max-w-lg border-[4px] border-black bg-[#00ffff] shadow-[8px_8px_0_#000000] max-h-[90vh] overflow-y-auto">
           <div class="flex items-center justify-between border-b-[4px] border-black px-6 py-4">
             <h2 class="font-black text-xl uppercase tracking-widest text-black">
               // EDIT POST
