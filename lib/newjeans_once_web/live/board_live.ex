@@ -4,6 +4,7 @@ defmodule NewjeansOnceWeb.BoardLive do
   alias NewjeansOnce.Board.Message
   alias NewjeansOnce.Presence
   alias NewjeansOnce.Reactions
+  alias NewjeansOnce.Repo
 
   @presence_topic "bunnies:lobby"
   @reaction_types ~w(star cat bunny)
@@ -37,14 +38,18 @@ defmodule NewjeansOnceWeb.BoardLive do
         socket
       end
 
+    reactions = Reactions.get_all(post_ids)
+
     {:ok,
      socket
      |> assign(:guest_name, guest_name)
+     |> assign(:guest_color, name_color(guest_name))
      |> assign(:fan_count, count_fans())
      |> assign(:typing_count, 0)
      |> assign(:toast, nil)
      |> assign(:post_count, Board.count_messages())
-     |> assign(:reactions, Reactions.get_all(post_ids))
+     |> assign(:reactions, reactions)
+     |> assign(:potd_id, calc_potd(reactions))
      |> assign(:show_new_modal, false)
      |> assign(:new_form, to_form(Board.change_message(%Message{})))
      |> assign(:editing_id, nil)
@@ -58,6 +63,18 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   defp generate_guest_name do
     "#{Enum.random(@adjectives)}#{Enum.random(@nouns)}_#{:rand.uniform(9999)}"
+  end
+
+  defp name_color(""), do: "#888888"
+  defp name_color(name) do
+    hue = rem(:erlang.phash2(name), 360)
+    "hsl(#{hue},65%,55%)"
+  end
+
+  defp calc_potd(reactions) when reactions == %{}, do: nil
+  defp calc_potd(reactions) do
+    {id, counts} = Enum.max_by(reactions, fn {_id, c} -> Map.values(c) |> Enum.sum() end)
+    if Map.values(counts) |> Enum.sum() > 0, do: id, else: nil
   end
 
   defp count_fans, do: Presence.list(@presence_topic) |> map_size()
@@ -87,18 +104,61 @@ defmodule NewjeansOnceWeb.BoardLive do
     do: {:noreply, stream_insert(socket, :messages, msg)}
 
   def handle_info({:deleted, msg}, socket) do
+    new_reactions = Map.delete(socket.assigns.reactions, msg.id)
     {:noreply,
      socket
-     |> update(:reactions, &Map.delete(&1, msg.id))
+     |> assign(:reactions, new_reactions)
+     |> assign(:potd_id, calc_potd(new_reactions))
      |> update(:post_count, &(&1 - 1))
      |> stream_delete(:messages, msg)}
   end
 
   def handle_info({:reaction_updated, post_id, counts}, socket) do
-    {:noreply,
-     socket
-     |> update(:reactions, &Map.put(&1, post_id, counts))
-     |> push_event("reactions:updated", %{post_id: post_id, counts: counts})}
+    old_potd = socket.assigns.potd_id
+    old_total = (socket.assigns.reactions[post_id] || %{star: 0, cat: 0, bunny: 0})
+                |> Map.values() |> Enum.sum()
+    new_total = Map.values(counts) |> Enum.sum()
+    new_reactions = Map.put(socket.assigns.reactions, post_id, counts)
+    new_potd = calc_potd(new_reactions)
+
+    socket =
+      socket
+      |> assign(:reactions, new_reactions)
+      |> assign(:potd_id, new_potd)
+      |> push_event("reactions:updated", %{post_id: post_id, counts: counts})
+
+    # Confetti for everyone when a post crosses 10 total reactions
+    socket =
+      if new_total >= 10 && old_total < 10,
+        do: push_event(socket, "confetti", %{}),
+        else: socket
+
+    # POTD changed — re-render both cards so crown appears/disappears
+    socket =
+      if new_potd != old_potd do
+        socket =
+          if old_potd do
+            case Repo.get(Message, old_potd) do
+              nil -> socket
+              msg -> stream_insert(socket, :messages, msg)
+            end
+          else
+            socket
+          end
+
+        if new_potd do
+          case Repo.get(Message, new_potd) do
+            nil -> socket
+            msg -> stream_insert(socket, :messages, msg, at: 0)
+          end
+        else
+          socket
+        end
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket),
@@ -261,13 +321,13 @@ defmodule NewjeansOnceWeb.BoardLive do
             >
               <span class="text-xl font-black leading-none">+</span> NEW POST
             </button>
-            <span class={[
-              "font-black uppercase text-[10px] tracking-widest",
-              if(@guest_name == "",
-                do: "text-base-content/25 animate-pulse",
-                else: "text-base-content/50"
-              )
-            ]}>
+            <span
+              style={if @guest_name != "", do: "color:#{@guest_color}", else: ""}
+              class={[
+                "font-black uppercase text-[10px] tracking-widest",
+                if(@guest_name == "", do: "text-base-content/25 animate-pulse", else: "")
+              ]}
+            >
               {if @guest_name == "", do: "· · ·", else: @guest_name}
             </span>
           </div>
@@ -307,14 +367,17 @@ defmodule NewjeansOnceWeb.BoardLive do
             }
             class={[
               "border-[4px] bg-base-100 overflow-hidden group transition-all duration-150",
-              if(@editing_id == to_string(msg.id),
-                do:
-                  "border-[#00ffff] shadow-[5px_5px_0_#00ffff] -translate-x-[3px] -translate-y-[3px]",
-                else:
+              cond do
+                @editing_id == to_string(msg.id) ->
+                  "border-[#00ffff] shadow-[5px_5px_0_#00ffff] -translate-x-[3px] -translate-y-[3px]"
+                msg.id == @potd_id ->
+                  "border-[#ffd700] shadow-[5px_5px_0_#ffd700] -translate-x-[3px] -translate-y-[3px]"
+                true ->
                   "border-black dark:border-white shadow-[5px_5px_0_#000000] dark:shadow-[5px_5px_0_#ffffff] hover:-translate-x-[3px] hover:-translate-y-[3px] hover:shadow-[8px_8px_0_#000000] dark:hover:shadow-[8px_8px_0_#ffffff]"
-              )
+              end
             ]}
           >
+            <div :if={msg.id == @potd_id} class="h-[6px] bg-[#ffd700]"></div>
             <img
               :if={msg.photo_url && msg.photo_url != ""}
               src={msg.photo_url}
@@ -454,13 +517,16 @@ defmodule NewjeansOnceWeb.BoardLive do
             <input type="hidden" name={@new_form[:author].name} value={@guest_name} />
             <div class="flex items-center gap-2">
               <span class="font-black uppercase text-[10px] tracking-widest text-black/50 dark:text-white/50">POSTING AS</span>
-              <span class={[
-                "font-black uppercase text-xs tracking-widest px-2 py-0.5",
-                if(@guest_name == "",
-                  do: "bg-black/15 dark:bg-white/15 text-transparent animate-pulse",
-                  else: "bg-black dark:bg-white text-white dark:text-black"
-                )
-              ]}>
+              <span
+                style={if @guest_name != "", do: "background:#{@guest_color};color:black", else: ""}
+                class={[
+                  "font-black uppercase text-xs tracking-widest px-2 py-0.5",
+                  if(@guest_name == "",
+                    do: "bg-black/15 dark:bg-white/15 text-transparent animate-pulse",
+                    else: "border-[2px] border-black"
+                  )
+                ]}
+              >
                 {if @guest_name == "", do: "· · ·", else: @guest_name}
               </span>
             </div>
