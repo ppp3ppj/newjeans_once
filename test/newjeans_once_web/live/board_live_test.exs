@@ -75,9 +75,7 @@ defmodule NewjeansOnceWeb.BoardLiveTest do
       view_a |> element("button[phx-click='open_new_modal']") |> render_click()
 
       view_a
-      |> form("#new-message-form",
-        message: %{author: "Hanni", title: "HANNI RULES", description: "yes"}
-      )
+      |> form("#new-message-form", message: %{title: "HANNI RULES", description: "yes"})
       |> render_submit()
 
       assert render(view_b) =~ "HANNI RULES"
@@ -90,12 +88,10 @@ defmodule NewjeansOnceWeb.BoardLiveTest do
       view_a |> element("button[phx-click='open_new_modal']") |> render_click()
 
       view_a
-      |> form("#new-message-form",
-        message: %{author: "Minji", title: "Test Toast", description: "hello"}
-      )
+      |> form("#new-message-form", message: %{title: "Test Toast", description: "hello"})
       |> render_submit()
 
-      assert render(view_b) =~ "NEW POST BY Minji"
+      assert render(view_b) =~ "NEW POST BY"
     end
 
     test "confetti push_event is sent only to the poster", %{conn: conn} do
@@ -105,9 +101,7 @@ defmodule NewjeansOnceWeb.BoardLiveTest do
       view_poster |> element("button[phx-click='open_new_modal']") |> render_click()
 
       view_poster
-      |> form("#new-message-form",
-        message: %{author: "Danielle", title: "CONFETTI TEST", description: "boom"}
-      )
+      |> form("#new-message-form", message: %{title: "CONFETTI TEST", description: "boom"})
       |> render_submit()
 
       # Poster's socket receives confetti
@@ -253,7 +247,7 @@ defmodule NewjeansOnceWeb.BoardLiveTest do
 
       view_a
       |> form("#edit-message-form",
-        message: %{author: post.author, title: "New Title", description: post.description}
+        message: %{title: "New Title", description: post.description}
       )
       |> render_submit()
 

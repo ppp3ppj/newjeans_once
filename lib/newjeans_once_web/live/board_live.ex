@@ -7,20 +7,36 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   @presence_topic "bunnies:lobby"
   @reaction_types ~w(star cat bunny)
+  @member_names ~w(Minji Hanni Danielle Haerin Hyein)
 
   def mount(_params, _session, socket) do
+    {guest_name, new_visitor} =
+      if connected?(socket) do
+        case get_connect_params(socket) do
+          %{"guest_name" => name} when is_binary(name) and name != "" -> {name, false}
+          _ -> {generate_guest_name(), true}
+        end
+      else
+        {"", false}
+      end
+
     messages = Board.list_messages()
     post_ids = Enum.map(messages, & &1.id)
 
-    if connected?(socket) do
-      Board.subscribe()
-      {:ok, _} = Presence.track(self(), @presence_topic, socket.id, %{typing: false})
-      Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, @presence_topic)
-      Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, "reactions")
-    end
+    socket =
+      if connected?(socket) do
+        Board.subscribe()
+        {:ok, _} = Presence.track(self(), @presence_topic, socket.id, %{typing: false})
+        Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, @presence_topic)
+        Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, "reactions")
+        if new_visitor, do: push_event(socket, "assign_name", %{name: guest_name}), else: socket
+      else
+        socket
+      end
 
     {:ok,
      socket
+     |> assign(:guest_name, guest_name)
      |> assign(:fan_count, count_fans())
      |> assign(:typing_count, 0)
      |> assign(:toast, nil)
@@ -36,6 +52,8 @@ defmodule NewjeansOnceWeb.BoardLive do
      |> assign(:show_info_modal, false)
      |> stream(:messages, messages)}
   end
+
+  defp generate_guest_name, do: "#{Enum.random(@member_names)} ##{:rand.uniform(99)}"
 
   defp count_fans, do: Presence.list(@presence_topic) |> map_size()
 
@@ -102,11 +120,15 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   # Create
   def handle_event("validate_new", %{"message" => p}, socket) do
+    name = if socket.assigns.guest_name != "", do: socket.assigns.guest_name, else: generate_guest_name()
+    p = Map.update(p, "author", name, fn "" -> name; v -> v end)
     form = Board.change_message(%Message{}, p) |> Map.put(:action, :validate) |> to_form()
     {:noreply, assign(socket, :new_form, form)}
   end
 
   def handle_event("save_new", %{"message" => p}, socket) do
+    name = if socket.assigns.guest_name != "", do: socket.assigns.guest_name, else: generate_guest_name()
+    p = Map.update(p, "author", name, fn "" -> name; v -> v end)
     case Board.create_message(p) do
       {:ok, _} ->
         Presence.update(self(), @presence_topic, socket.id, %{typing: false})
@@ -211,7 +233,7 @@ defmodule NewjeansOnceWeb.BoardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} fan_count={@fan_count} post_count={@post_count}>
-      <div class="max-w-3xl mx-auto flex flex-col gap-8">
+      <div id="board-root" phx-hook="GuestName" class="max-w-3xl mx-auto flex flex-col gap-8">
         <%!-- Hero header + action row --%>
         <div class="pt-4 pb-2 flex items-end justify-between gap-4">
           <div class="relative inline-block">
@@ -227,12 +249,23 @@ defmodule NewjeansOnceWeb.BoardLive do
               ★
             </button>
           </div>
-          <button
-            phx-click="open_new_modal"
-            class="btn btn-neutral shrink-0 flex items-center gap-2 px-6"
-          >
-            <span class="text-xl font-black leading-none">+</span> NEW POST
-          </button>
+          <div class="flex flex-col items-end gap-1.5 shrink-0">
+            <button
+              phx-click="open_new_modal"
+              class="btn btn-neutral flex items-center gap-2 px-6"
+            >
+              <span class="text-xl font-black leading-none">+</span> NEW POST
+            </button>
+            <span class={[
+              "font-black uppercase text-[10px] tracking-widest",
+              if(@guest_name == "",
+                do: "text-base-content/25 animate-pulse",
+                else: "text-base-content/50"
+              )
+            ]}>
+              {if @guest_name == "", do: "· · ·", else: @guest_name}
+            </span>
+          </div>
         </div>
 
         <%!-- Typing indicator --%>
@@ -413,7 +446,19 @@ defmodule NewjeansOnceWeb.BoardLive do
             phx-change="validate_new"
             class="flex flex-col gap-4 p-6"
           >
-            <.input field={@new_form[:author]} label="Your name" placeholder="e.g. BUNNY_HANNI" />
+            <input type="hidden" name={@new_form[:author].name} value={@guest_name} />
+            <div class="flex items-center gap-2">
+              <span class="font-black uppercase text-[10px] tracking-widest text-black/50 dark:text-white/50">POSTING AS</span>
+              <span class={[
+                "font-black uppercase text-xs tracking-widest px-2 py-0.5",
+                if(@guest_name == "",
+                  do: "bg-black/15 dark:bg-white/15 text-transparent animate-pulse",
+                  else: "bg-black dark:bg-white text-white dark:text-black"
+                )
+              ]}>
+                {if @guest_name == "", do: "· · ·", else: @guest_name}
+              </span>
+            </div>
             <.input
               field={@new_form[:title]}
               label="Title"
@@ -469,7 +514,6 @@ defmodule NewjeansOnceWeb.BoardLive do
             phx-submit="save_edit"
             class="flex flex-col gap-4 p-6"
           >
-            <.input field={@edit_form[:author]} label="Your name" />
             <.input field={@edit_form[:title]} label="Title" />
             <.input field={@edit_form[:description]} type="textarea" label="Message" />
             <.input field={@edit_form[:photo_url]} label="Image URL (optional)" />
