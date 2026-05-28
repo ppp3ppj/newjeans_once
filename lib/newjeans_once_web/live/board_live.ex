@@ -7,7 +7,10 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   @presence_topic "bunnies:lobby"
   @reaction_types ~w(star cat bunny)
-  @member_names ~w(Minji Hanni Danielle Haerin Hyein)
+  @adjectives ~w(Fluffy Neon Dreamy Cosmic Kawaii Retro Bubbly Sparkly Pastel Electric
+                 Velvet Fuzzy Tiny Sweet Bouncy Starry Misty Glittery Vintage Hyper)
+  @nouns ~w(Bunny Kitty Puppy Panda Otter Hamster Peach Blossom Denim Sneaker
+            Vinyl Cookie Mochi Latte Bubble Tulip Daisy Ribbon Cassette Petal)
 
   def mount(_params, _session, socket) do
     {guest_name, new_visitor} =
@@ -53,7 +56,9 @@ defmodule NewjeansOnceWeb.BoardLive do
      |> stream(:messages, messages)}
   end
 
-  defp generate_guest_name, do: "#{Enum.random(@member_names)} ##{:rand.uniform(99)}"
+  defp generate_guest_name do
+    "#{Enum.random(@adjectives)}#{Enum.random(@nouns)}_#{:rand.uniform(9999)}"
+  end
 
   defp count_fans, do: Presence.list(@presence_topic) |> map_size()
 
