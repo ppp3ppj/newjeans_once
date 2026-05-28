@@ -27,6 +27,17 @@ import topbar from "../vendor/topbar"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 
+// Single source of truth for cursor visibility — shared between CursorToggle and CursorTracker
+let cursorEnabled = localStorage.getItem("cursor_enabled") === "true"
+
+// Deterministic color from name — same name always gives the same color
+const CURSOR_COLORS = ["#ff6600","#00ffff","#ffff00","#ff69b4","#00ff99","#bf5fff"]
+function cursorColor(name) {
+  let h = 0
+  for (const c of name) h = Math.imul(31, h) + c.charCodeAt(0) | 0
+  return CURSOR_COLORS[Math.abs(h) % CURSOR_COLORS.length]
+}
+
 const Hooks = {
   ModalScrollLock: {
     mounted()   { document.body.classList.add("overflow-hidden") },
@@ -38,6 +49,111 @@ const Hooks = {
         localStorage.setItem("guest_name", name)
       })
     }
+  },
+  CursorToggle: {
+    mounted() {
+      const sync = () => {
+        this.el.textContent = cursorEnabled ? "ON" : "OFF"
+        this.el.style.borderColor = cursorEnabled ? "white" : ""
+        this.el.style.color = cursorEnabled ? "white" : ""
+      }
+      sync()
+      this._click = () => {
+        cursorEnabled = !cursorEnabled
+        localStorage.setItem("cursor_enabled", cursorEnabled ? "true" : "false")
+        sync()
+        window.dispatchEvent(new CustomEvent("fanwall:cursor-toggle", {detail: {enabled: cursorEnabled}}))
+      }
+      this.el.addEventListener("click", this._click)
+    },
+    destroyed() { this.el.removeEventListener("click", this._click) },
+  },
+  CursorTracker: {
+    mounted() {
+      // Single canvas overlay — one paint pass for all cursors
+      const canvas = document.createElement("canvas")
+      canvas.style.cssText = "position:fixed;top:0;left:0;pointer-events:none;z-index:9999"
+      document.body.appendChild(canvas)
+      this._canvas = canvas
+      const ctx = canvas.getContext("2d")
+
+      const setSize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
+      setSize()
+      this._resize = setSize
+      window.addEventListener("resize", this._resize)
+
+      // Cursor state: current pos (lerped) + target pos (from server)
+      const cursors = new Map()
+      const lerp = (a, b, t) => a + (b - a) * t
+
+      const render = () => {
+        const W = canvas.width, H = canvas.height
+        ctx.clearRect(0, 0, W, H)
+        for (const c of cursors.values()) {
+          c.x = lerp(c.x, c.tx, 0.18)
+          c.y = lerp(c.y, c.ty, 0.18)
+          const px = c.x / 100 * W, py = c.y / 100 * H
+          ctx.save()
+          ctx.translate(px, py)
+          // Arrow
+          ctx.beginPath()
+          ctx.moveTo(0, 0); ctx.lineTo(0, 14); ctx.lineTo(3.5, 10.5)
+          ctx.lineTo(6, 17); ctx.lineTo(8, 16); ctx.lineTo(5.5, 9.5)
+          ctx.lineTo(10, 9.5); ctx.closePath()
+          ctx.fillStyle = c.color; ctx.fill()
+          ctx.strokeStyle = "#000"; ctx.lineWidth = 1.5; ctx.lineJoin = "round"; ctx.stroke()
+          // Name badge
+          ctx.font = "900 10px monospace"
+          const tw = ctx.measureText(c.name).width
+          const bx = 14, by = 14, bp = 5, bh = 18, bw = tw + bp * 2
+          ctx.fillStyle = c.color; ctx.fillRect(bx, by, bw, bh)
+          ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(bx, by, bw, bh)
+          ctx.fillStyle = "#000"; ctx.fillText(c.name, bx + bp, by + 13)
+          ctx.restore()
+        }
+        this._raf = requestAnimationFrame(render)
+      }
+      this._raf = requestAnimationFrame(render)
+
+      // Toggle controls only whether YOU see others — your cursor always broadcasts
+      this._showOthers = cursorEnabled
+      this._onToggle = ({detail: {enabled}}) => {
+        this._showOthers = enabled
+        if (!enabled) cursors.clear()
+      }
+      window.addEventListener("fanwall:cursor-toggle", this._onToggle)
+
+      // Always send your own cursor regardless of toggle
+      let last = 0
+      this._move = (e) => {
+        const now = performance.now()
+        if (now - last < 50) return
+        last = now
+        this.pushEvent("cursor_move", {
+          x: Math.round(e.clientX / window.innerWidth * 100),
+          y: Math.round(e.clientY / window.innerHeight * 100),
+        })
+      }
+      this._leave = () => this.pushEvent("cursor_leave", {})
+      window.addEventListener("mousemove", this._move)
+      window.addEventListener("mouseleave", this._leave)
+
+      this.handleEvent("cursor:updated", ({id, name, x, y}) => {
+        if (!this._showOthers) return
+        const c = cursors.get(id)
+        if (c) { c.tx = x; c.ty = y }
+        else cursors.set(id, {x, y, tx: x, ty: y, name, color: cursorColor(name)})
+      })
+      this.handleEvent("cursor:removed", ({id}) => cursors.delete(id))
+    },
+    destroyed() {
+      cancelAnimationFrame(this._raf)
+      this._canvas?.remove()
+      window.removeEventListener("fanwall:cursor-toggle", this._onToggle)
+      window.removeEventListener("mousemove", this._move)
+      window.removeEventListener("mouseleave", this._leave)
+      window.removeEventListener("resize", this._resize)
+    },
   },
 }
 

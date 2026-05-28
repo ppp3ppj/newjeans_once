@@ -398,4 +398,57 @@ defmodule NewjeansOnceWeb.BoardLiveTest do
       refute_push_event(view, "confetti", %{})
     end
   end
+
+  # ── Live cursor presence ─────────────────────────────────────────────────────
+
+  describe "live cursor presence" do
+    test "cursor_move broadcasts position to other connected users", %{conn: conn} do
+      {:ok, view_a, _} = live(conn, ~p"/")
+      {:ok, view_b, _} = live(conn, ~p"/")
+
+      render_hook(view_a, "cursor_move", %{"x" => 50, "y" => 30})
+
+      assert_push_event(view_b, "cursor:updated", %{x: 50, y: 30})
+    end
+
+    test "sender does not receive their own cursor:updated", %{conn: conn} do
+      {:ok, view_a, _} = live(conn, ~p"/")
+
+      render_hook(view_a, "cursor_move", %{"x" => 50, "y" => 30})
+
+      refute_push_event(view_a, "cursor:updated", %{})
+    end
+
+    test "cursor:updated includes the sender's guest name", %{conn: conn} do
+      {:ok, view_a, _} = live(conn, ~p"/")
+      {:ok, view_b, _} = live(conn, ~p"/")
+
+      render_hook(view_a, "cursor_move", %{"x" => 25, "y" => 75})
+
+      assert_push_event(view_b, "cursor:updated", %{x: 25, y: 75, name: _})
+    end
+
+    test "cursor_leave removes cursor from all other clients", %{conn: conn} do
+      {:ok, view_a, _} = live(conn, ~p"/")
+      {:ok, view_b, _} = live(conn, ~p"/")
+
+      render_hook(view_a, "cursor_move", %{"x" => 50, "y" => 30})
+      assert_push_event(view_b, "cursor:updated", %{})
+
+      render_hook(view_a, "cursor_leave", %{})
+
+      assert_push_event(view_b, "cursor:removed", %{})
+    end
+
+    test "multiple cursor positions from same user update correctly", %{conn: conn} do
+      {:ok, view_a, _} = live(conn, ~p"/")
+      {:ok, view_b, _} = live(conn, ~p"/")
+
+      render_hook(view_a, "cursor_move", %{"x" => 10, "y" => 20})
+      assert_push_event(view_b, "cursor:updated", %{x: 10, y: 20})
+
+      render_hook(view_a, "cursor_move", %{"x" => 60, "y" => 80})
+      assert_push_event(view_b, "cursor:updated", %{x: 60, y: 80})
+    end
+  end
 end

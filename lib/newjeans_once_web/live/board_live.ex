@@ -7,6 +7,7 @@ defmodule NewjeansOnceWeb.BoardLive do
   alias NewjeansOnce.Repo
 
   @presence_topic "bunnies:lobby"
+  @cursor_topic   "board:cursors"
   @reaction_types ~w(star cat bunny)
   @adjectives ~w(Fluffy Neon Dreamy Cosmic Kawaii Retro Bubbly Sparkly Pastel Electric
                  Velvet Fuzzy Tiny Sweet Bouncy Starry Misty Glittery Vintage Hyper)
@@ -33,6 +34,7 @@ defmodule NewjeansOnceWeb.BoardLive do
         {:ok, _} = Presence.track(self(), @presence_topic, socket.id, %{typing: false})
         Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, @presence_topic)
         Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, "reactions")
+        Phoenix.PubSub.subscribe(NewjeansOnce.PubSub, @cursor_topic)
         if new_visitor, do: push_event(socket, "assign_name", %{name: guest_name}), else: socket
       else
         socket
@@ -161,8 +163,23 @@ defmodule NewjeansOnceWeb.BoardLive do
     {:noreply, socket}
   end
 
-  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket),
-    do: {:noreply, socket |> assign(:fan_count, count_fans()) |> assign(:typing_count, count_typing())}
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff", payload: diff}, socket) do
+    socket =
+      diff.leaves
+      |> Map.keys()
+      |> Enum.reduce(socket, fn id, acc -> push_event(acc, "cursor:removed", %{id: id}) end)
+
+    {:noreply, socket |> assign(:fan_count, count_fans()) |> assign(:typing_count, count_typing())}
+  end
+
+  def handle_info({:cursor_moved, id, _name, _x, _y}, %{id: sid} = socket) when id == sid,
+    do: {:noreply, socket}
+
+  def handle_info({:cursor_moved, id, name, x, y}, socket),
+    do: {:noreply, push_event(socket, "cursor:updated", %{id: id, name: name, x: x, y: y})}
+
+  def handle_info({:cursor_removed, id}, socket),
+    do: {:noreply, push_event(socket, "cursor:removed", %{id: id})}
 
   def handle_info({:nuked}, socket) do
     {:noreply,
@@ -246,6 +263,18 @@ defmodule NewjeansOnceWeb.BoardLive do
 
   def handle_event("react", _, socket), do: {:noreply, socket}
 
+  # Cursor presence
+  def handle_event("cursor_move", %{"x" => x, "y" => y}, socket) do
+    Phoenix.PubSub.broadcast(NewjeansOnce.PubSub, @cursor_topic,
+      {:cursor_moved, socket.id, socket.assigns.guest_name, x, y})
+    {:noreply, socket}
+  end
+
+  def handle_event("cursor_leave", _, socket) do
+    Phoenix.PubSub.broadcast(NewjeansOnce.PubSub, @cursor_topic, {:cursor_removed, socket.id})
+    {:noreply, socket}
+  end
+
   # Info modal
   def handle_event("open_info_modal", _, socket),
     do: {:noreply, assign(socket, :show_info_modal, true)}
@@ -298,6 +327,7 @@ defmodule NewjeansOnceWeb.BoardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} fan_count={@fan_count} post_count={@post_count}>
+      <div id="cursor-tracker" phx-hook="CursorTracker" aria-hidden="true" class="sr-only"></div>
       <div id="board-root" phx-hook="GuestName" class="max-w-3xl mx-auto flex flex-col gap-8">
         <%!-- Hero header + action row --%>
         <div class="pt-4 pb-2 flex items-end justify-between gap-4">
@@ -707,6 +737,22 @@ defmodule NewjeansOnceWeb.BoardLive do
                 <code class="font-mono font-black text-xs text-white">
                   {to_string(:erlang.system_info(:otp_release))}
                 </code>
+              </div>
+            </div>
+            <div class="border-t-[3px] border-white/20 pt-4">
+              <p class="font-black uppercase text-[10px] tracking-widest text-white/30 mb-3">
+                SETTINGS
+              </p>
+              <div class="flex items-center justify-between mb-4">
+                <span class="font-black uppercase text-[10px] tracking-widest text-white/50">
+                  SEE OTHER CURSORS
+                </span>
+                <button
+                  id="cursor-toggle"
+                  type="button"
+                  phx-hook="CursorToggle"
+                  class="font-black uppercase text-[10px] tracking-widest px-3 py-1.5 border-[2px] border-white/30 text-white/40 hover:border-white hover:text-white transition-all duration-150"
+                ></button>
               </div>
             </div>
             <div class="border-t-[3px] border-white/20 pt-4">
